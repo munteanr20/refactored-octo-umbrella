@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 
 export async function signup(formData: FormData) {
@@ -15,12 +16,6 @@ export async function signup(formData: FormData) {
     redirect(`/signup?error=${encodeURIComponent(error.message)}`);
   }
 
-  // The public.profiles row is created automatically by the
-  // on_auth_user_created trigger (see supabase/migrations/0001_init.sql).
-  redirect(
-    "/login?message=" +
-      encodeURIComponent(
-        "Check your email to confirm your account, then log in."
-      )
-  );
+  revalidatePath("/", "layout");
+  redirect("/dashboard");
 }
