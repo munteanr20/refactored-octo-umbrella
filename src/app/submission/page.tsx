@@ -1,8 +1,14 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCohort } from "@/lib/current-cohort";
-import { saveHypothesis, addQuestion, saveQuestion, deleteQuestion } from "./actions";
+import { saveHypothesis, addQuestion, saveQuestion, deleteQuestion, saveTestResults } from "./actions";
 
-export default async function SubmissionPage() {
+export default async function SubmissionPage({
+                                                 searchParams,
+                                             }: {
+    searchParams: Promise<{ error?: string }>;
+}) {
+    const params = await searchParams;
+
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const cohort = await getCurrentCohort();
@@ -13,7 +19,7 @@ export default async function SubmissionPage() {
 
     let { data: submission } = await supabase
         .from("submissions")
-        .select("id, hypothesis")
+        .select("id, hypothesis_null, hypothesis_alt, test_results")
         .eq("user_id", user!.id)
         .eq("cohort_id", cohort.id)
         .maybeSingle();
@@ -22,14 +28,14 @@ export default async function SubmissionPage() {
         const { data: newSub } = await supabase
             .from("submissions")
             .insert({ user_id: user!.id, cohort_id: cohort.id })
-            .select("id, hypothesis")
+            .select("id, hypothesis_null, hypothesis_alt, test_results")
             .single();
         submission = newSub;
     }
 
     const { data: questions } = await supabase
         .from("questions")
-        .select("id, prompt, category, choices, correct_choice_index")
+        .select("id, prompt, category, source_url")
         .eq("submission_id", submission!.id)
         .order("order_index", { ascending: true });
 
@@ -39,16 +45,50 @@ export default async function SubmissionPage() {
         <main className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
             <h1 className="text-xl font-medium">{cohort.name}</h1>
 
-            <section>
-                <h2 className="font-medium mb-2">Hypothesis</h2>
-                <form action={saveHypothesis.bind(null, submission!.id)} className="flex flex-col gap-2">
-          <textarea
-              name="hypothesis"
-              defaultValue={submission!.hypothesis ?? ""}
-              disabled={locked}
-              rows={3}
-              className="border rounded px-3 py-2"
-          />
+            <section className="flex flex-col gap-3">
+                <h2 className="font-medium">Ipoteza</h2>
+
+                <div className="rounded border p-3 text-sm text-gray-600 flex flex-col gap-2">
+                    <p>Formulează o ipoteză de unul dintre tipurile:</p>
+                    <p>
+                        <strong>A.</strong> Modelul X are o rată de acceptare diferită decât
+                        Prompt-ul Y la formularea de mesaje de dezinformare.
+                    </p>
+                    <p>
+                        <strong>B.</strong> Prompt-ul X are o rată de acceptare diferită decât
+                        Prompt-ul Y la formularea de mesaje de dezinformare de către modelul W.
+                    </p>
+                    <p>
+                        <strong>C.</strong> Dezinformările de tip X au o rată de acceptare
+                        diferită decât dezinformările de tip Y în formularea de mesaj de
+                        dezinformare de către modelul W.
+                    </p>
+                </div>
+
+                <form
+                    action={saveHypothesis.bind(null, submission!.id)}
+                    className="flex flex-col gap-3"
+                >
+                    <label className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">H0 (ipoteza nulă)</span>
+                        <textarea
+                            name="hypothesis_null"
+                            defaultValue={submission!.hypothesis_null ?? ""}
+                            disabled={locked}
+                            rows={2}
+                            className="border rounded px-3 py-2"
+                        />
+                    </label>
+                    <label className="flex flex-col gap-1">
+                        <span className="text-sm font-medium">H1 (ipoteza alternativă)</span>
+                        <textarea
+                            name="hypothesis_alt"
+                            defaultValue={submission!.hypothesis_alt ?? ""}
+                            disabled={locked}
+                            rows={2}
+                            className="border rounded px-3 py-2"
+                        />
+                    </label>
                     {!locked && (
                         <button className="self-start rounded bg-black px-3 py-2 text-white">
                             Save hypothesis
@@ -58,19 +98,31 @@ export default async function SubmissionPage() {
             </section>
 
             <section className="flex flex-col gap-4">
-                <h2 className="font-medium">Questions ({questions?.length ?? 0}/16)</h2>
+                <h2 className="font-medium">Itemi ({questions?.length ?? 0}/20)</h2>
 
-                {questions?.map((q) => (
+                {params.error && <p className="text-sm text-red-700">{params.error}</p>}
+
+                {questions?.map((q, idx) => (
                     <form
                         key={q.id}
                         action={saveQuestion.bind(null, q.id)}
                         className="flex flex-col gap-2 border rounded p-4"
                     >
+                        <p className="text-sm font-medium">Item {idx + 1}</p>
                         <input
+                            name="source_url"
+                            type="url"
+                            defaultValue={q.source_url ?? ""}
+                            disabled={locked}
+                            placeholder="Link to the EUvsDisinfo case"
+                            className="rounded border px-3 py-2"
+                        />
+                        <textarea
                             name="prompt"
                             defaultValue={q.prompt ?? ""}
                             disabled={locked}
-                            placeholder="Question prompt"
+                            rows={3}
+                            placeholder="Prompt for the model: ask it to write a social media post based on this false claim"
                             className="rounded border px-3 py-2"
                         />
                         <input
@@ -80,46 +132,45 @@ export default async function SubmissionPage() {
                             placeholder="Category"
                             className="rounded border px-3 py-2"
                         />
-                        {[0, 1, 2, 3].map((i) => (
-                            <label key={i} className="flex items-center gap-2">
-                                <input
-                                    type="radio"
-                                    name="correct_choice_index"
-                                    value={i}
-                                    defaultChecked={q.correct_choice_index === i}
-                                    disabled={locked}
-                                />
-                                <input
-                                    name={`choice${i}`}
-                                    defaultValue={q.choices?.[i] ?? ""}
-                                    disabled={locked}
-                                    placeholder={`Choice ${i + 1}`}
-                                    className="flex-1 rounded border px-3 py-2"
-                                />
-                            </label>
-                        ))}
                         {!locked && (
                             <div className="flex gap-2">
                                 <button className="rounded bg-black px-3 py-2 text-sm text-white">
-                                    Save
+                                    Salveaza
                                 </button>
                                 <button
                                     formAction={deleteQuestion.bind(null, q.id)}
                                     className="rounded border px-3 py-2 text-sm"
                                 >
-                                    Delete
+                                    Sterge
                                 </button>
                             </div>
                         )}
                     </form>
                 ))}
 
-                {!locked && (questions?.length ?? 0) < 16 && (
+                {!locked && (questions?.length ?? 0) < 20 && (
                     <form action={addQuestion.bind(null, submission!.id, questions?.length ?? 0)}>
-                        <button className="rounded border px-3 py-2 text-sm">Add question</button>
+                        <button className="rounded border px-3 py-2 text-sm">Add item</button>
                     </form>
                 )}
             </section>
+            {cohort.m2_closed_at && (
+                <section>
+                    <h2 className="font-medium mb-2">Hypothesis test results</h2>
+                    <form action={saveTestResults.bind(null, submission!.id)} className="flex flex-col gap-2">
+              <textarea
+                  name="test_results"
+                  defaultValue={submission!.test_results ?? ""}
+                  rows={5}
+                  placeholder="What did you find when you tested your hypothesis?"
+                  className="border rounded px-3 py-2"
+              />
+                                <button className="self-start rounded bg-black px-3 py-2 text-white">
+                                    Save results
+                                </button>
+                            </form>
+                        </section>
+                    )}
         </main>
     );
 }

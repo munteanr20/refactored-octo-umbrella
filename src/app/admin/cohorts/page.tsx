@@ -1,13 +1,15 @@
 import { createClient } from "@/lib/supabase/server";
-import { createCohort, closeM1 } from "./actions";
+import {createCohort, closeM1, closeM2, formGroups} from "./actions";
 
 export default async function AdminCohortsPage() {
     const supabase = await createClient();
 
     const { data: cohorts } = await supabase
         .from("cohorts")
-        .select("id, name, m1_closed_at")
+        .select("id, name, m1_closed_at, m2_closed_at, groups_formed_at")
         .order("created_at", { ascending: false });
+
+
 
     return (
         <main className="mx-auto flex max-w-md flex-col gap-6 p-8">
@@ -18,13 +20,30 @@ export default async function AdminCohortsPage() {
             <li key={cohort.id} className="border rounded p-3">
         <p>{cohort.name}</p>
         <p className="text-sm text-gray-600">
-        {cohort.m1_closed_at ? "M1 closed" : "M1 open"}
+            {cohort.m1_closed_at ? "M1 closed" : "M1 open"}
         </p>
-    {!cohort.m1_closed_at && (
-        <form action={closeM1.bind(null, cohort.id)}>
-        <button className="text-sm underline mt-1">Close M1</button>
-    </form>
-    )}
+        {!cohort.m1_closed_at && (
+            <form action={closeM1.bind(null, cohort.id)}>
+                <button className="text-sm underline mt-1">Close M1</button>
+            </form>
+        )}
+
+        {cohort.groups_formed_at && !cohort.m2_closed_at && (
+            <form action={closeM2.bind(null, cohort.id)}>
+                <button className="text-sm underline mt-1">Close M2</button>
+            </form>
+        )}
+        {cohort.m2_closed_at && (
+            <p className="text-sm text-gray-600">M2 closed</p>
+        )}
+        {cohort.m1_closed_at && !cohort.groups_formed_at && (
+            <form action={formGroups.bind(null, cohort.id)}>
+                <button className="text-sm underline mt-1">Form groups</button>
+            </form>
+        )}
+        {cohort.groups_formed_at && (
+            <p className="text-sm text-gray-600">Groups formed</p>
+        )}
     </li>
 ))}
     </ul>

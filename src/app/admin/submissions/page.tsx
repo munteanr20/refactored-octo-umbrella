@@ -4,7 +4,8 @@ import { getCurrentCohort } from "@/lib/current-cohort";
 
 type SubmissionRow = {
     id: string;
-    hypothesis: string | null;
+    hypothesis_null : string | null;
+    hypothesis_alt: string | null;
     profiles: { email: string } | null;
 };
 
@@ -18,7 +19,7 @@ export default async function AdminSubmissionsPage() {
 
     const { data } = await supabase
         .from("submissions")
-        .select("id, hypothesis, profiles(email)")
+        .select("id, hypothesis_null, hypothesis_alt, profiles(email)")
         .eq("cohort_id", cohort.id);
 
     const submissions = data as SubmissionRow[] | null;
@@ -34,7 +35,7 @@ export default async function AdminSubmissionsPage() {
                 {submissions?.map((s) => (
                     <li key={s.id} className="border rounded p-3">
                         <p className="text-sm text-gray-600">{s.profiles?.email}</p>
-                        <p className="truncate">{s.hypothesis || "(no hypothesis yet)"}</p>
+                        <p className="truncate">{s.hypothesis_null || "(no hypothesis yet)"}</p>
                         <Link href={`/admin/submissions/${s.id}`} className="text-sm underline">
                             Review
                         </Link>

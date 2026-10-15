@@ -28,6 +28,9 @@ export default async function DashboardPage() {
           Go to admin area
         </Link>
       )}
+        <Link href="/validate" className="text-sm underline">
+            Validate assigned questions
+        </Link>
 
       <form action={logout}>
         <button className="rounded border px-3 py-2 text-sm">Log out</button>
