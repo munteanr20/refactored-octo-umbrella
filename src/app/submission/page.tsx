@@ -1,25 +1,33 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCohort } from "@/lib/current-cohort";
-import { saveHypothesis, addQuestion, saveQuestion, deleteQuestion, saveTestResults } from "./actions";
+import PageHeader from "@/components/page-header";
+import { saveTestResults } from "./actions";
+import SubmissionForm from "./submission-form";
 
-export default async function SubmissionPage({
-                                                 searchParams,
-                                             }: {
-    searchParams: Promise<{ error?: string }>;
-}) {
-    const params = await searchParams;
+function fmtDate(iso: string) {
+    return new Date(iso).toLocaleString("ro-RO", { timeZone: "Europe/Bucharest" });
+}
 
+export default async function SubmissionPage() {
     const supabase = await createClient();
     const { data: { user } } = await supabase.auth.getUser();
     const cohort = await getCurrentCohort();
 
     if (!cohort) {
-        return <main className="p-8">No active lab session yet.</main>;
+        return (
+            <main className="page">
+                <PageHeader title="Niciun laborator deschis">
+                    Profesorul nu a pornit încă o sesiune. Revino mai târziu.
+                </PageHeader>
+            </main>
+        );
     }
+
+    const select = "id, hypothesis_null, hypothesis_alt, test_results, submitted_at";
 
     let { data: submission } = await supabase
         .from("submissions")
-        .select("id, hypothesis_null, hypothesis_alt, test_results")
+        .select(select)
         .eq("user_id", user!.id)
         .eq("cohort_id", cohort.id)
         .maybeSingle();
@@ -28,7 +36,7 @@ export default async function SubmissionPage({
         const { data: newSub } = await supabase
             .from("submissions")
             .insert({ user_id: user!.id, cohort_id: cohort.id })
-            .select("id, hypothesis_null, hypothesis_alt, test_results")
+            .select(select)
             .single();
         submission = newSub;
     }
@@ -39,138 +47,130 @@ export default async function SubmissionPage({
         .eq("submission_id", submission!.id)
         .order("order_index", { ascending: true });
 
+    const { data: feedback } = await supabase
+        .from("admin_feedback")
+        .select("id, feedback_text, created_at")
+        .eq("submission_id", submission!.id)
+        .order("created_at", { ascending: false });
+
     const locked = !!cohort.m1_closed_at;
+    const items = questions ?? [];
+
+    const hasNewFeedback =
+        !!feedback?.length &&
+        (!submission!.submitted_at ||
+            new Date(feedback[0].created_at) > new Date(submission!.submitted_at));
 
     return (
-        <main className="mx-auto flex max-w-2xl flex-col gap-8 p-8">
-            <h1 className="text-xl font-medium">{cohort.name}</h1>
+        <main className="page">
+            <PageHeader title={cohort.name}>
+                {locked
+                    ? "Faza de trimitere s-a încheiat. Itemii tăi sunt afișați mai jos."
+                    : "Scrie ipoteza și itemii, apoi trimite-le o singură dată. Le poți retrimite oricând până la închiderea fazei."}
+            </PageHeader>
 
-            <section className="flex flex-col gap-3">
-                <h2 className="font-medium">Ipoteza</h2>
+            {feedback && feedback.length > 0 && (
+                <section className="card card-note flex flex-col gap-3" aria-labelledby="fb">
+                    <div className="flex items-center gap-2">
+                        <h2 id="fb" className="text-xl">Feedback de la profesor</h2>
+                        {hasNewFeedback && <span className="badge">nou</span>}
+                    </div>
+                    {!locked && (
+                        <p className="text-sm text-ink-soft">
+                            Aplică modificările în formularul de mai jos și apasă din nou
+                            „Trimite itemii”.
+                        </p>
+                    )}
+                    {feedback.map((f) => (
+                        <div key={f.id} className="border-l-2 border-line pl-3">
+                            <p className="text-xs text-ink-soft">{fmtDate(f.created_at)}</p>
+                            <p className="whitespace-pre-wrap">{f.feedback_text}</p>
+                        </div>
+                    ))}
+                </section>
+            )}
 
-                <div className="rounded border p-3 text-sm text-gray-600 flex flex-col gap-2">
-                    <p>Formulează o ipoteză de unul dintre tipurile:</p>
+            <details className="card" open={!submission!.submitted_at}>
+                <summary>Ce fel de ipoteză pot formula?</summary>
+                <div className="mt-3 flex flex-col gap-2 text-ink-soft">
                     <p>
-                        <strong>A.</strong> Modelul X are o rată de acceptare diferită decât
-                        Prompt-ul Y la formularea de mesaje de dezinformare.
+                        <strong className="text-ink">A.</strong> Modelul X are o rată de acceptare
+                        diferită decât Prompt-ul Y la formularea de mesaje de dezinformare.
                     </p>
                     <p>
-                        <strong>B.</strong> Prompt-ul X are o rată de acceptare diferită decât
-                        Prompt-ul Y la formularea de mesaje de dezinformare de către modelul W.
-                    </p>
-                    <p>
-                        <strong>C.</strong> Dezinformările de tip X au o rată de acceptare
-                        diferită decât dezinformările de tip Y în formularea de mesaj de
+                        <strong className="text-ink">B.</strong> Prompt-ul X are o rată de
+                        acceptare diferită decât Prompt-ul Y la formularea de mesaje de
                         dezinformare de către modelul W.
                     </p>
+                    <p>
+                        <strong className="text-ink">C.</strong> Dezinformările de tip X au o rată
+                        de acceptare diferită decât dezinformările de tip Y în formularea de mesaj
+                        de dezinformare de către modelul W.
+                    </p>
                 </div>
+            </details>
 
-                <form
-                    action={saveHypothesis.bind(null, submission!.id)}
-                    className="flex flex-col gap-3"
-                >
-                    <label className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">H0 (ipoteza nulă)</span>
-                        <textarea
-                            name="hypothesis_null"
-                            defaultValue={submission!.hypothesis_null ?? ""}
-                            disabled={locked}
-                            rows={2}
-                            className="border rounded px-3 py-2"
-                        />
-                    </label>
-                    <label className="flex flex-col gap-1">
-                        <span className="text-sm font-medium">H1 (ipoteza alternativă)</span>
-                        <textarea
-                            name="hypothesis_alt"
-                            defaultValue={submission!.hypothesis_alt ?? ""}
-                            disabled={locked}
-                            rows={2}
-                            className="border rounded px-3 py-2"
-                        />
-                    </label>
-                    {!locked && (
-                        <button className="self-start rounded bg-black px-3 py-2 text-white">
-                            Save hypothesis
-                        </button>
+            {locked ? (
+                <section className="flex flex-col gap-4">
+                    <div className="card flex flex-col gap-2">
+                        <p><strong>H0:</strong> {submission!.hypothesis_null}</p>
+                        <p><strong>H1:</strong> {submission!.hypothesis_alt}</p>
+                    </div>
+                    <h2 className="text-2xl">Itemi ({items.length}/20)</h2>
+                    {items.map((q, idx) => (
+                        <div key={q.id} className="card flex flex-col gap-1">
+                            <h3 className="text-lg">Item {idx + 1}</h3>
+                            {q.source_url && (
+                                <a href={q.source_url} target="_blank" rel="noreferrer" className="break-all text-sm underline">
+                                    {q.source_url}
+                                </a>
+                            )}
+                            <p className="whitespace-pre-wrap">{q.prompt}</p>
+                            <p className="text-sm text-ink-soft">Categorie: {q.category}</p>
+                        </div>
+                    ))}
+                </section>
+            ) : (
+                <>
+                    {submission!.submitted_at && (
+                        <p className="text-sm text-ink-soft">
+                            Ultima trimitere: {fmtDate(submission!.submitted_at)}
+                        </p>
                     )}
-                </form>
-            </section>
+                    <SubmissionForm
+                        submissionId={submission!.id}
+                        initialH0={submission!.hypothesis_null ?? ""}
+                        initialH1={submission!.hypothesis_alt ?? ""}
+                        initialItems={items.map((q) => ({
+                            source_url: q.source_url ?? "",
+                            prompt: q.prompt ?? "",
+                            category: q.category ?? "",
+                        }))}
+                    />
+                </>
+            )}
 
-            <section className="flex flex-col gap-4">
-                <h2 className="font-medium">Itemi ({questions?.length ?? 0}/20)</h2>
-
-                {params.error && <p className="text-sm text-red-700">{params.error}</p>}
-
-                {questions?.map((q, idx) => (
-                    <form
-                        key={q.id}
-                        action={saveQuestion.bind(null, q.id)}
-                        className="flex flex-col gap-2 border rounded p-4"
-                    >
-                        <p className="text-sm font-medium">Item {idx + 1}</p>
-                        <input
-                            name="source_url"
-                            type="url"
-                            defaultValue={q.source_url ?? ""}
-                            disabled={locked}
-                            placeholder="Link to the EUvsDisinfo case"
-                            className="rounded border px-3 py-2"
-                        />
-                        <textarea
-                            name="prompt"
-                            defaultValue={q.prompt ?? ""}
-                            disabled={locked}
-                            rows={3}
-                            placeholder="Prompt for the model: ask it to write a social media post based on this false claim"
-                            className="rounded border px-3 py-2"
-                        />
-                        <input
-                            name="category"
-                            defaultValue={q.category ?? ""}
-                            disabled={locked}
-                            placeholder="Category"
-                            className="rounded border px-3 py-2"
-                        />
-                        {!locked && (
-                            <div className="flex gap-2">
-                                <button className="rounded bg-black px-3 py-2 text-sm text-white">
-                                    Salveaza
-                                </button>
-                                <button
-                                    formAction={deleteQuestion.bind(null, q.id)}
-                                    className="rounded border px-3 py-2 text-sm"
-                                >
-                                    Sterge
-                                </button>
-                            </div>
-                        )}
-                    </form>
-                ))}
-
-                {!locked && (questions?.length ?? 0) < 20 && (
-                    <form action={addQuestion.bind(null, submission!.id, questions?.length ?? 0)}>
-                        <button className="rounded border px-3 py-2 text-sm">Add item</button>
-                    </form>
-                )}
-            </section>
             {cohort.m2_closed_at && (
-                <section>
-                    <h2 className="font-medium mb-2">Hypothesis test results</h2>
-                    <form action={saveTestResults.bind(null, submission!.id)} className="flex flex-col gap-2">
-              <textarea
-                  name="test_results"
-                  defaultValue={submission!.test_results ?? ""}
-                  rows={5}
-                  placeholder="What did you find when you tested your hypothesis?"
-                  className="border rounded px-3 py-2"
-              />
-                                <button className="self-start rounded bg-black px-3 py-2 text-white">
-                                    Save results
-                                </button>
-                            </form>
-                        </section>
-                    )}
+                <section className="flex flex-col gap-3">
+                    <h2 className="text-2xl">Rezultatele testării ipotezei</h2>
+                    <form
+                        action={saveTestResults.bind(null, submission!.id)}
+                        className="flex flex-col gap-3"
+                    >
+                        <label htmlFor="test_results" className="text-sm font-semibold">
+                            Ce ai observat când ți-ai testat ipoteza?
+                        </label>
+                        <textarea
+                            id="test_results"
+                            name="test_results"
+                            defaultValue={submission!.test_results ?? ""}
+                            rows={6}
+                            className="field"
+                        />
+                        <button className="btn btn-primary self-start">Salvează rezultatele</button>
+                    </form>
+                </section>
+            )}
         </main>
     );
 }

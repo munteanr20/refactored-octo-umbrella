@@ -75,6 +75,7 @@ async function main() {
                 cohort_id: cohort.id,
                 hypothesis_null: `H0 test de la studentul ${i}: nu există diferență între modele.`,
                 hypothesis_alt: `H1 test de la studentul ${i}: există o diferență între modele.`,
+                submitted_at: new Date().toISOString(),
             })
             .select("id")
             .single();

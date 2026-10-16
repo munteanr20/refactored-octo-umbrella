@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCohort } from "@/lib/current-cohort";
+import PageHeader from "@/components/page-header";
+
+export const metadata = { title: "Trimiteri" };
 
 type SubmissionRow = {
     id: string;
-    hypothesis_null : string | null;
-    hypothesis_alt: string | null;
+    hypothesis_null: string | null;
+    submitted_at: string | null;
     profiles: { email: string } | null;
+    questions: { count: number }[];
 };
 
 export default async function AdminSubmissionsPage() {
@@ -14,33 +18,58 @@ export default async function AdminSubmissionsPage() {
     const cohort = await getCurrentCohort();
 
     if (!cohort) {
-        return <main className="p-8">No active lab session yet.</main>;
+        return (
+            <main className="page">
+                <PageHeader title="Trimiteri">Nu există nicio cohortă.</PageHeader>
+            </main>
+        );
     }
 
     const { data } = await supabase
         .from("submissions")
-        .select("id, hypothesis_null, hypothesis_alt, profiles(email)")
-        .eq("cohort_id", cohort.id);
+        .select("id, hypothesis_null, submitted_at, profiles(email), questions(count)")
+        .eq("cohort_id", cohort.id)
+        .order("submitted_at", { ascending: false, nullsFirst: false });
 
-    const submissions = data as SubmissionRow[] | null;
+    const submissions = data as unknown as SubmissionRow[] | null;
+    const sent = (submissions ?? []).filter((s) => s.submitted_at).length;
 
     return (
-        <main className="mx-auto flex max-w-2xl flex-col gap-4 p-8">
-            <h1 className="text-xl font-medium">{cohort.name} — submissions</h1>
-            <Link href="/admin/submissions/export" className="text-sm underline">
-                Export CSV
-            </Link>
+        <main className="page">
+            <PageHeader title={`${cohort.name}: trimiteri`}>
+                {sent} din {submissions?.length ?? 0} studenți au trimis itemii.
+            </PageHeader>
 
-            <ul className="flex flex-col gap-2">
-                {submissions?.map((s) => (
-                    <li key={s.id} className="border rounded p-3">
-                        <p className="text-sm text-gray-600">{s.profiles?.email}</p>
-                        <p className="truncate">{s.hypothesis_null || "(no hypothesis yet)"}</p>
-                        <Link href={`/admin/submissions/${s.id}`} className="text-sm underline">
-                            Review
-                        </Link>
-                    </li>
-                ))}
+            <div className="flex flex-wrap gap-2">
+                <Link href="/admin/submissions/export-items" className="btn">Exportă itemii (CSV)</Link>
+                <Link href="/admin/submissions/export-validations" className="btn">Exportă evaluările (CSV)</Link>
+            </div>
+
+            {submissions?.length === 0 && (
+                <p className="card text-ink-soft">Niciun student nu s-a înscris încă în această cohortă.</p>
+            )}
+
+            <ul className="flex flex-col gap-3">
+                {submissions?.map((s) => {
+                    const count = s.questions?.[0]?.count ?? 0;
+                    return (
+                        <li key={s.id}>
+                            <Link href={`/admin/submissions/${s.id}`} className="card card-link flex flex-col gap-1 no-underline">
+                                <div className="flex items-center justify-between gap-2">
+                                    <p className="truncate text-sm text-ink-soft">{s.profiles?.email}</p>
+                                    {s.submitted_at ? (
+                                        <span className="badge badge-ok">{count} itemi</span>
+                                    ) : (
+                                        <span className="badge badge-mute">netrimis</span>
+                                    )}
+                                </div>
+                                <p className="line-clamp-2">
+                                    {s.hypothesis_null || "Fără ipoteză încă"}
+                                </p>
+                            </Link>
+                        </li>
+                    );
+                })}
             </ul>
         </main>
     );

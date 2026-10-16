@@ -1,5 +1,11 @@
 import { createClient } from "@/lib/supabase/server";
-import {createCohort, closeM1, closeM2, formGroups} from "./actions";
+import PageHeader from "@/components/page-header";
+import PhaseStepper from "@/components/phase-stepper";
+import ConfirmButton from "@/components/confirm-button";
+import SubmitButton from "@/components/submit-button";
+import { createCohort, closeM1, closeM2, formGroups } from "./actions";
+
+export const metadata = { title: "Cohorte" };
 
 export default async function AdminCohortsPage() {
     const supabase = await createClient();
@@ -9,49 +15,75 @@ export default async function AdminCohortsPage() {
         .select("id, name, m1_closed_at, m2_closed_at, groups_formed_at")
         .order("created_at", { ascending: false });
 
-
-
     return (
-        <main className="mx-auto flex max-w-md flex-col gap-6 p-8">
-        <h1 className="text-xl font-medium">Cohorts</h1>
+        <main className="page">
+            <PageHeader title="Cohorte">
+                Aplicația lucrează cu cea mai nouă cohortă. Etapele se închid în ordine și nu pot fi redeschise.
+            </PageHeader>
 
-            <ul className="flex flex-col gap-3">
-        {cohorts?.map((cohort) => (
-            <li key={cohort.id} className="border rounded p-3">
-        <p>{cohort.name}</p>
-        <p className="text-sm text-gray-600">
-            {cohort.m1_closed_at ? "M1 closed" : "M1 open"}
-        </p>
-        {!cohort.m1_closed_at && (
-            <form action={closeM1.bind(null, cohort.id)}>
-                <button className="text-sm underline mt-1">Close M1</button>
-            </form>
-        )}
+            <ul className="flex flex-col gap-4">
+                {cohorts?.length === 0 && (
+                    <li className="card text-ink-soft">Nu există nicio cohortă încă. Creeaz-o mai jos.</li>
+                )}
 
-        {cohort.groups_formed_at && !cohort.m2_closed_at && (
-            <form action={closeM2.bind(null, cohort.id)}>
-                <button className="text-sm underline mt-1">Close M2</button>
-            </form>
-        )}
-        {cohort.m2_closed_at && (
-            <p className="text-sm text-gray-600">M2 closed</p>
-        )}
-        {cohort.m1_closed_at && !cohort.groups_formed_at && (
-            <form action={formGroups.bind(null, cohort.id)}>
-                <button className="text-sm underline mt-1">Form groups</button>
-            </form>
-        )}
-        {cohort.groups_formed_at && (
-            <p className="text-sm text-gray-600">Groups formed</p>
-        )}
-    </li>
-))}
-    </ul>
+                {cohorts?.map((c, i) => (
+                    <li key={c.id} className="card flex flex-col gap-5">
+                        <div className="flex items-center gap-2">
+                            <h2 className="text-xl">{c.name}</h2>
+                            {i === 0 && <span className="badge">activă</span>}
+                        </div>
 
-    <form action={createCohort} className="flex flex-col gap-2">
-    <input name="name" placeholder="Cohort name" className="border rounded px-3 py-2" />
-    <button className="rounded bg-black px-3 py-2 text-white">Create cohort</button>
-    </form>
-    </main>
-);
+                        <PhaseStepper cohort={c} />
+
+                        <div className="flex flex-wrap gap-2">
+                            {!c.m1_closed_at && (
+                                <form action={closeM1.bind(null, c.id)}>
+                                    <ConfirmButton message="Închizi trimiterea itemilor? Studenții nu vor mai putea modifica nimic.">
+                                        Închide trimiterea itemilor
+                                    </ConfirmButton>
+                                </form>
+                            )}
+                            {c.m1_closed_at && !c.groups_formed_at && (
+                                <form action={formGroups.bind(null, c.id)}>
+                                    <ConfirmButton
+                                        className="btn btn-primary"
+                                        message="Formezi grupurile acum? Atribuirea este aleatorie și nu se poate anula."
+                                    >
+                                        Formează grupurile
+                                    </ConfirmButton>
+                                </form>
+                            )}
+                            {c.groups_formed_at && !c.m2_closed_at && (
+                                <form action={closeM2.bind(null, c.id)}>
+                                    <ConfirmButton message="Închizi validarea? Evaluările nu vor mai putea fi modificate.">
+                                        Închide validarea
+                                    </ConfirmButton>
+                                </form>
+                            )}
+                            {c.m2_closed_at && (
+                                <p className="text-sm text-ink-soft">Toate etapele sunt încheiate.</p>
+                            )}
+                        </div>
+                    </li>
+                ))}
+            </ul>
+
+            <section className="card flex flex-col gap-3">
+                <h2 className="text-xl">Cohortă nouă</h2>
+                <form action={createCohort} className="flex flex-col gap-3">
+                    <label htmlFor="name" className="text-sm font-semibold">Numele cohortei</label>
+                    <input
+                        id="name"
+                        name="name"
+                        required
+                        placeholder="Statistică aplicată 2026–27"
+                        className="field"
+                    />
+                    <SubmitButton pendingLabel="Se creează..." className="btn btn-primary self-start">
+                        Creează cohorta
+                    </SubmitButton>
+                </form>
+            </section>
+        </main>
+    );
 }

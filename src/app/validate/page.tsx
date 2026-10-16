@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentM2Cohort } from "@/lib/current-cohort";
+import PageHeader from "@/components/page-header";
 import { saveAllValidations } from "./actions";
 import ValidateForm, { type Item } from "./validate-form";
+
+export const metadata = { title: "Validare" };
 
 type ValidationRow = {
     id: string;
@@ -26,6 +29,16 @@ export default async function ValidatePage({
     } = await supabase.auth.getUser();
     const cohort = await getCurrentM2Cohort();
 
+    if (!cohort) {
+        return (
+            <main className="page">
+                <PageHeader title="Validare">
+                    Validarea începe după ce profesorul închide trimiterea itemilor și formează grupurile.
+                </PageHeader>
+            </main>
+        );
+    }
+
     const { data } = await supabase
         .from("validations")
         .select("id, verdict, rating, questions(prompt, category, source_url)")
@@ -43,27 +56,34 @@ export default async function ValidatePage({
         category: v.questions?.category ?? null,
     }));
 
-    const locked = !!cohort?.m2_closed_at;
+    const locked = !!cohort.m2_closed_at;
     const total = items.length;
     const done = items.filter((i) => i.verdict).length;
 
     return (
-        <main className="mx-auto flex max-w-2xl flex-col gap-6 p-8">
-            <h1 className="text-xl font-medium">Itemi de evaluat</h1>
+        <main className="page">
+            <PageHeader title="Itemi de evaluat">
+                {locked
+                    ? "Evaluarea s-a încheiat. Răspunsurile tale sunt afișate mai jos."
+                    : "Itemii sunt anonimi: nu vezi cine i-a scris. Toți itemii trebuie evaluați."}
+            </PageHeader>
 
             {total > 0 && (
-                <p className="text-sm text-gray-600">
-                    Completate: {done} din {total}
-                    {locked && " (evaluarea este închisă)"}
+                <p className="text-sm text-ink-soft">
+                    Salvate: {done} din {total}
                 </p>
             )}
 
             {params.saved && !params.error && (
-                <p className="text-sm text-green-700">Evaluările au fost salvate.</p>
+                <p role="status" className="alert alert-ok">Evaluările au fost salvate.</p>
             )}
-            {params.error && <p className="text-sm text-red-700">{params.error}</p>}
+            {params.error && (
+                <p role="alert" className="alert alert-error">{params.error}</p>
+            )}
 
-            {total === 0 && <p>Nu ți-a fost atribuit nimic încă.</p>}
+            {total === 0 && (
+                <p className="card text-ink-soft">Nu ți-a fost atribuit niciun item.</p>
+            )}
 
             {total > 0 && (
                 <ValidateForm items={items} locked={locked} action={saveAllValidations} />

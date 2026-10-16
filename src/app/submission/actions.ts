@@ -2,23 +2,48 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
+import { validateSubmission, type ItemInput } from "@/lib/submission-rules";
 
-const MAX_ITEMS = 20;
+export type SubmitResult = { ok: true } | { ok: false; error: string };
 
-export async function saveHypothesis(submissionId: string, formData: FormData) {
+export async function submitSubmission(
+    submissionId: string,
+    h0: string,
+    h1: string,
+    items: ItemInput[]
+): Promise<SubmitResult> {
+    const clean: ItemInput[] = items.map((it) => ({
+        source_url: String(it.source_url ?? "").trim(),
+        prompt: String(it.prompt ?? "").trim(),
+        category: String(it.category ?? "").trim(),
+    }));
+
+    const errors = validateSubmission(String(h0 ?? "").trim(), String(h1 ?? "").trim(), clean);
+    if (errors.length > 0) {
+        return { ok: false, error: errors[0].message };
+    }
+
     const supabase = await createClient();
+    const { error } = await supabase.rpc("save_submission", {
+        p_submission_id: submissionId,
+        p_h0: String(h0).trim(),
+        p_h1: String(h1).trim(),
+        p_items: clean,
+    });
 
-    const { error } = await supabase
-        .from("submissions")
-        .update({
-            hypothesis_null: formData.get("hypothesis_null") as string,
-            hypothesis_alt: formData.get("hypothesis_alt") as string,
-        })
-        .eq("id", submissionId);
+    if (error) {
+        console.error("save_submission failed:", error);
+        if (error.message.includes("locked")) {
+            return { ok: false, error: "Faza de trimitere s-a închis." };
+        }
+        if (error.message.includes("not_allowed")) {
+            return { ok: false, error: "Nu ai voie să modifici această trimitere." };
+        }
+        return { ok: false, error: "Nu s-a putut salva. Încearcă din nou." };
+    }
 
-    if (error) console.error("saveHypothesis failed:", error);
     revalidatePath("/submission");
+    return { ok: true };
 }
 
 export async function saveTestResults(submissionId: string, formData: FormData) {
@@ -31,69 +56,5 @@ export async function saveTestResults(submissionId: string, formData: FormData) 
         .eq("id", submissionId);
 
     if (error) console.error("saveTestResults failed:", error);
-    revalidatePath("/submission");
-}
-
-function isEuvsdisinfoUrl(raw: string) {
-    try {
-        const host = new URL(raw).hostname.toLowerCase();
-        return host === "euvsdisinfo.eu" || host.endsWith(".euvsdisinfo.eu");
-    } catch {
-        return false;
-    }
-}
-
-export async function addQuestion(submissionId: string, nextOrderIndex: number) {
-    const supabase = await createClient();
-
-    const { count } = await supabase
-        .from("questions")
-        .select("id", { count: "exact", head: true })
-        .eq("submission_id", submissionId);
-
-    if ((count ?? 0) >= MAX_ITEMS) return;
-
-    const { error } = await supabase.from("questions").insert({
-        submission_id: submissionId,
-        prompt: "",
-        category: "",
-        source_url: "",
-        order_index: nextOrderIndex,
-    });
-
-    if (error) console.error("addQuestion failed:", error);
-    revalidatePath("/submission");
-}
-
-export async function saveQuestion(questionId: string, formData: FormData) {
-    const supabase = await createClient();
-
-    const sourceUrl = ((formData.get("source_url") as string) ?? "").trim();
-
-    if (sourceUrl && !isEuvsdisinfoUrl(sourceUrl)) {
-        redirect(
-            "/submission?error=" +
-            encodeURIComponent("The link must point to euvsdisinfo.eu.")
-        );
-    }
-
-    const { error } = await supabase
-        .from("questions")
-        .update({
-            source_url: sourceUrl || null,
-            prompt: formData.get("prompt") as string,
-            category: formData.get("category") as string,
-        })
-        .eq("id", questionId);
-
-    if (error) console.error("saveQuestion failed:", error);
-    revalidatePath("/submission");
-}
-
-export async function deleteQuestion(questionId: string) {
-    const supabase = await createClient();
-    const { error } = await supabase.from("questions").delete().eq("id", questionId);
-
-    if (error) console.error("deleteQuestion failed:", error);
     revalidatePath("/submission");
 }

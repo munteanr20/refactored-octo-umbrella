@@ -85,10 +85,10 @@ export async function GET() {
         );
     });
 
-    return new Response(rows.join("\n"), {
+    return new Response("\uFEFF" + rows.join("\n"), {
         headers: {
             "Content-Type": "text/csv",
-            "Content-Disposition": `attachment; filename="${cohort.name}-validations.csv"`,
+            "Content-Disposition": `attachment; filename="${cohort.name.replace(/[^\w.-]+/g, "_")}-validations.csv"`,
         },
     });
 }

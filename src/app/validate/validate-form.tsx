@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import SubmitButton from "@/components/submit-button";
 
 export type Item = {
     id: string;
@@ -12,10 +13,10 @@ export type Item = {
 };
 
 const RATINGS = [
-    { value: 1, label: "1 – Deloc realist" },
-    { value: 2, label: "2 – Puțin realist" },
-    { value: 3, label: "3 – Realist" },
-    { value: 4, label: "4 – Destul de realist" },
+    { value: 1, label: "Deloc realist" },
+    { value: 2, label: "Puțin realist" },
+    { value: 3, label: "Realist" },
+    { value: 4, label: "Destul de realist" },
 ];
 
 export default function ValidateForm({
@@ -91,95 +92,109 @@ export default function ValidateForm({
         setErrors({});
     }
 
+    const answered = items.filter((i) => {
+        const v = verdicts[i.id];
+        return v === "invalid" || (v === "valid" && ratings[i.id] != null);
+    }).length;
+    const pct = items.length ? Math.round((answered / items.length) * 100) : 0;
     const errorCount = Object.keys(errors).length;
 
     return (
-        <form
-            action={action}
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-6"
-        >
+        <form action={action} onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
             {items.map((item, idx) => {
                 const verdict = verdicts[item.id];
                 const ratingEnabled = !locked && verdict === "valid";
+                const err = errors[item.id];
 
                 return (
                     <div
                         key={item.id}
                         id={`item-${item.id}`}
-                        className={`flex flex-col gap-3 rounded border p-4 ${
-                            errors[item.id] ? "border-red-600" : ""
-                        }`}
+                        className={`card flex flex-col gap-5 ${err ? "card-error" : ""}`}
                     >
-                        <p className="text-sm font-medium">Item {idx + 1}</p>
-
-                        {item.source_url && (
-                            <a
-                                href={item.source_url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-sm underline"
-                            >
-                                {item.source_url}
-                            </a>
-                        )}
-                        <p>{item.prompt}</p>
-                        <p className="text-sm text-gray-600">Categorie: {item.category}</p>
-
-                        <div className="flex gap-4">
-                            <label className="flex items-center gap-1">
-                                <input
-                                    type="radio"
-                                    name={`verdict_${item.id}`}
-                                    value="valid"
-                                    checked={verdict === "valid"}
-                                    onChange={() => chooseVerdict(item.id, "valid")}
-                                    disabled={locked}
-                                />
-                                Valid
-                            </label>
-                            <label className="flex items-center gap-1">
-                                <input
-                                    type="radio"
-                                    name={`verdict_${item.id}`}
-                                    value="invalid"
-                                    checked={verdict === "invalid"}
-                                    onChange={() => chooseVerdict(item.id, "invalid")}
-                                    disabled={locked}
-                                />
-                                Invalid
-                            </label>
+                        <div className="flex items-center justify-between gap-2">
+                            <h2 className="text-xl">Item {idx + 1}</h2>
+                            {item.category && <span className="badge badge-mute">{item.category}</span>}
                         </div>
 
-                        <div
-                            className={`flex flex-col gap-1 ${
-                                ratingEnabled ? "" : "opacity-50"
-                            }`}
-                        >
-                            <p className="text-sm text-gray-600">
-                                Dacă ai ales valid, alege și cât de realist este promptul:
+                        <div className="flex flex-col gap-2">
+                            <p className="text-sm font-semibold">Promptul</p>
+                            <p className="whitespace-pre-wrap rounded-xl border border-line bg-paper p-3">
+                                {item.prompt}
                             </p>
-                            {RATINGS.map((r) => (
-                                <label
-                                    key={r.value}
-                                    className="flex items-center gap-2 text-sm"
+                            {item.source_url && (
+                                <a
+                                    href={item.source_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="break-all text-sm underline"
                                 >
+                                    Deschide cazul de pe euvsdisinfo.eu
+                                </a>
+                            )}
+                        </div>
+
+                        <fieldset className="flex flex-col gap-2">
+                            <legend className="mb-1 text-sm font-semibold">Este un item valid?</legend>
+                            <div className="grid grid-cols-2 gap-2">
+                                <label className="choice">
                                     <input
                                         type="radio"
-                                        name={`rating_${item.id}`}
-                                        value={r.value}
-                                        checked={ratings[item.id] === r.value}
-                                        onChange={() => chooseRating(item.id, r.value)}
-                                        disabled={!ratingEnabled}
+                                        className="choice-input"
+                                        name={`verdict_${item.id}`}
+                                        value="valid"
+                                        checked={verdict === "valid"}
+                                        onChange={() => chooseVerdict(item.id, "valid")}
+                                        disabled={locked}
                                     />
-                                    {r.label}
+                                    <span className="choice-box font-semibold">Valid</span>
                                 </label>
-                            ))}
-                        </div>
+                                <label className="choice">
+                                    <input
+                                        type="radio"
+                                        className="choice-input is-bad"
+                                        name={`verdict_${item.id}`}
+                                        value="invalid"
+                                        checked={verdict === "invalid"}
+                                        onChange={() => chooseVerdict(item.id, "invalid")}
+                                        disabled={locked}
+                                    />
+                                    <span className="choice-box font-semibold">Invalid</span>
+                                </label>
+                            </div>
+                        </fieldset>
 
-                        {errors[item.id] && (
-                            <p role="alert" className="text-sm text-red-700">
-                                {errors[item.id]}
+                        <fieldset className="flex flex-col gap-2">
+                            <legend className="mb-1 text-sm font-semibold">Cât de realist este promptul?</legend>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                                {RATINGS.map((r) => (
+                                    <label key={r.value} className="choice">
+                                        <input
+                                            type="radio"
+                                            className="choice-input"
+                                            name={`rating_${item.id}`}
+                                            value={r.value}
+                                            checked={ratings[item.id] === r.value}
+                                            onChange={() => chooseRating(item.id, r.value)}
+                                            disabled={!ratingEnabled}
+                                        />
+                                        <span className="choice-box flex-col !items-start !gap-0">
+                                            <span className="font-display text-xl">{r.value}</span>
+                                            <span className="text-xs text-ink-soft">{r.label}</span>
+                                        </span>
+                                    </label>
+                                ))}
+                            </div>
+                            {!ratingEnabled && !locked && (
+                                <p className="text-sm text-ink-soft">
+                                    Nota se alege doar pentru itemii marcați valid.
+                                </p>
+                            )}
+                        </fieldset>
+
+                        {err && (
+                            <p role="alert" className="text-sm text-ember">
+                                {err}
                             </p>
                         )}
                     </div>
@@ -187,16 +202,21 @@ export default function ValidateForm({
             })}
 
             {!locked && (
-                <div className="flex flex-col gap-2">
+                <div className="sticky-bar flex flex-col gap-2">
+                    <div className="progress" aria-hidden="true">
+                        <div style={{ width: `${pct}%` }} />
+                    </div>
+                    <div className="flex flex-wrap items-center justify-between gap-3">
+                        <p className="text-sm">
+                            <strong>{answered}</strong> din {items.length} itemi evaluați
+                        </p>
+                        <SubmitButton pendingLabel="Se salvează...">Salvează evaluările</SubmitButton>
+                    </div>
                     {errorCount > 0 && (
-                        <p role="alert" className="text-sm text-red-700">
-                            Mai ai {errorCount}{" "}
-                            {errorCount === 1 ? "item necompletat" : "itemi necompletați"}.
+                        <p role="alert" className="alert alert-error">
+                            Mai ai {errorCount} {errorCount === 1 ? "item necompletat" : "itemi necompletați"}.
                         </p>
                     )}
-                    <button className="self-start rounded bg-black px-4 py-2 text-white">
-                        Salvează evaluările
-                    </button>
                 </div>
             )}
         </form>

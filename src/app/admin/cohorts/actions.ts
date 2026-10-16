@@ -69,7 +69,13 @@ export async function formGroups(cohortId: string) {
     }
 
     type Student = { user_id: string; questions: { id: string }[] };
-    const shuffled = [...(submissions as Student[])].sort(() => Math.random() - 0.5);
+
+    const { data: admins } = await supabase.from("profiles").select("id").eq("role", "admin");
+    const adminIds = new Set((admins ?? []).map((a) => a.id));
+
+    const shuffled = (submissions as Student[])
+        .filter((s) => !adminIds.has(s.user_id))
+        .sort(() => Math.random() - 0.5);
 
     const n = shuffled.length;
     const remainder = n % 3;

@@ -1,49 +1,63 @@
 import Link from "next/link";
+import PageHeader from "@/components/page-header";
+import SubmitButton from "@/components/submit-button";
 import { signup } from "./actions";
 
+export const metadata = { title: "Cont nou" };
+
 export default async function SignupPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ error?: string }>;
+                                             searchParams,
+                                         }: {
+    searchParams: Promise<{ error?: string }>;
 }) {
-  const params = await searchParams;
+    const params = await searchParams;
 
-  return (
-    <main className="mx-auto flex max-w-sm flex-col gap-6 p-8">
-      <h1 className="text-xl font-medium">Sign up</h1>
+    return (
+        <main className="page page-narrow">
+            <PageHeader title="Cont nou">
+                Folosește adresa ta UPB (@stud.acs.upb.ro sau alt domeniu upb.ro).
+            </PageHeader>
 
-      {params.error && <p className="text-sm text-red-700">{params.error}</p>}
+            <div className="card flex flex-col gap-5">
+                {params.error && (
+                    <p role="alert" className="alert alert-error">{params.error}</p>
+                )}
 
-      <form className="flex flex-col gap-4">
-        <input
-          name="email"
-          type="email"
-          required
-          placeholder="Email"
-          className="rounded border px-3 py-2"
-        />
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={6}
-          placeholder="Password"
-          className="rounded border px-3 py-2"
-        />
-        <button
-          formAction={signup}
-          className="rounded bg-black px-3 py-2 text-white"
-        >
-          Sign up
-        </button>
-      </form>
+                <form action={signup} className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-1.5">
+                        <label htmlFor="email" className="text-sm font-semibold">Email</label>
+                        <input
+                            id="email"
+                            name="email"
+                            type="email"
+                            required
+                            autoComplete="email"
+                            placeholder="nume.prenume@stud.acs.upb.ro"
+                            className="field"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1.5">
+                        <label htmlFor="password" className="text-sm font-semibold">Parolă</label>
+                        <input
+                            id="password"
+                            name="password"
+                            type="password"
+                            required
+                            minLength={6}
+                            autoComplete="new-password"
+                            className="field"
+                            aria-describedby="password-hint"
+                        />
+                        <p id="password-hint" className="text-sm text-ink-soft">Minim 6 caractere.</p>
+                    </div>
+                    <SubmitButton pendingLabel="Se creează contul...">Creează contul</SubmitButton>
+                </form>
+            </div>
 
-      <p className="text-sm">
-        Already have an account?{" "}
-        <Link href="/login" className="underline">
-          Log in
-        </Link>
-      </p>
-    </main>
-  );
+            <p className="text-center text-sm text-ink-soft">
+                Ai deja cont?{" "}
+                <Link href="/login" className="underline">Autentifică-te</Link>
+            </p>
+        </main>
+    );
 }
