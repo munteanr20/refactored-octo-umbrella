@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentCohort } from "@/lib/current-cohort";
+import { getCohortForAdmin } from "@/lib/current-cohort";
 
 function csvEscape(value: string | null | undefined): string {
     const str = value ?? "";
-    if (/[",\n]/.test(str)) {
+    if (/[",\n\r]/.test(str)) {
         return `"${str.replace(/"/g, '""')}"`;
     }
     return str;
@@ -12,6 +12,7 @@ function csvEscape(value: string | null | undefined): string {
 type ValidationRow = {
     verdict: string | null;
     rating: number | null;
+    filled_by_admin: boolean;
     profiles: { email: string } | null;
     questions: {
         id: string;
@@ -19,18 +20,22 @@ type ValidationRow = {
         prompt: string | null;
         category: string | null;
         order_index: number;
-        submissions: { cohort_id: string; profiles: { email: string } | null };
+        submissions: {
+            cohort_id: string;
+            hypothesis_type: string | null;
+            profiles: { email: string } | null;
+        };
     };
 };
 
 const PAGE_SIZE = 1000;
 
-export async function GET() {
+export async function GET(request: Request) {
     const supabase = await createClient();
-    const cohort = await getCurrentCohort();
+    const cohort = await getCohortForAdmin(new URL(request.url).searchParams.get("cohort"));
 
     if (!cohort) {
-        return new Response("No active cohort", { status: 404 });
+        return new Response("No cohort", { status: 404 });
     }
 
     const validations: ValidationRow[] = [];
@@ -39,7 +44,7 @@ export async function GET() {
         const { data, error } = await supabase
             .from("validations")
             .select(
-                "verdict, rating, profiles!validator_id(email), questions!inner(id, source_url, prompt, category, order_index, submissions!inner(cohort_id, profiles(email)))"
+                "verdict, rating, filled_by_admin, profiles!validator_id(email), questions!inner(id, source_url, prompt, category, order_index, submissions!inner(cohort_id, hypothesis_type, profiles(email)))"
             )
             .eq("questions.submissions.cohort_id", cohort.id)
             .order("id")
@@ -58,11 +63,13 @@ export async function GET() {
     const header = [
         "item_id",
         "author_email",
+        "hypothesis_type",
         "item_number",
         "source_url",
         "prompt",
         "category",
         "validator_email",
+        "filled_by_staff",
         "verdict",
         "rating",
     ];
@@ -74,11 +81,13 @@ export async function GET() {
             [
                 csvEscape(v.questions.id),
                 csvEscape(v.questions.submissions.profiles?.email),
+                csvEscape(v.questions.submissions.hypothesis_type),
                 String(v.questions.order_index + 1),
                 csvEscape(v.questions.source_url),
                 csvEscape(v.questions.prompt),
                 csvEscape(v.questions.category),
                 csvEscape(v.profiles?.email),
+                v.filled_by_admin ? "yes" : "no",
                 csvEscape(v.verdict),
                 v.rating === null ? "" : String(v.rating),
             ].join(",")
@@ -87,7 +96,7 @@ export async function GET() {
 
     return new Response("\uFEFF" + rows.join("\n"), {
         headers: {
-            "Content-Type": "text/csv",
+            "Content-Type": "text/csv; charset=utf-8",
             "Content-Disposition": `attachment; filename="${cohort.name.replace(/[^\w.-]+/g, "_")}-validations.csv"`,
         },
     });

@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentCohort } from "@/lib/current-cohort";
 import PageHeader from "@/components/page-header";
+import { HYPOTHESIS_TYPES, isHypothesisType } from "@/lib/submission-rules";
 import { saveTestResults } from "./actions";
 import SubmissionForm from "./submission-form";
 
@@ -23,7 +24,8 @@ export default async function SubmissionPage() {
         );
     }
 
-    const select = "id, hypothesis_null, hypothesis_alt, test_results, submitted_at";
+    const select =
+        "id, hypothesis_type, hypothesis_null, hypothesis_alt, test_results, submitted_at";
 
     let { data: submission } = await supabase
         .from("submissions")
@@ -47,26 +49,32 @@ export default async function SubmissionPage() {
         .eq("submission_id", submission!.id)
         .order("order_index", { ascending: true });
 
+    // oldest first, newest at the bottom
     const { data: feedback } = await supabase
         .from("admin_feedback")
         .select("id, feedback_text, created_at")
         .eq("submission_id", submission!.id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
     const locked = !!cohort.m1_closed_at;
     const items = questions ?? [];
+    const type =
+        submission!.hypothesis_type && isHypothesisType(submission!.hypothesis_type)
+            ? submission!.hypothesis_type
+            : null;
 
+    const latestFeedback = feedback?.[feedback.length - 1];
     const hasNewFeedback =
-        !!feedback?.length &&
+        !!latestFeedback &&
         (!submission!.submitted_at ||
-            new Date(feedback[0].created_at) > new Date(submission!.submitted_at));
+            new Date(latestFeedback.created_at) > new Date(submission!.submitted_at));
 
     return (
         <main className="page">
             <PageHeader title={cohort.name}>
                 {locked
                     ? "Faza de trimitere s-a încheiat. Itemii tăi sunt afișați mai jos."
-                    : "Scrie ipoteza și itemii, apoi trimite-le o singură dată. Le poți retrimite oricând până la închiderea fazei."}
+                    : "Alege tipul ipotezei, scrie ipoteza și itemii, apoi trimite-le o singură dată. Le poți retrimite oricând până la închiderea fazei."}
             </PageHeader>
 
             {feedback && feedback.length > 0 && (
@@ -90,29 +98,15 @@ export default async function SubmissionPage() {
                 </section>
             )}
 
-            <details className="card" open={!submission!.submitted_at}>
-                <summary>Ce fel de ipoteză pot formula?</summary>
-                <div className="mt-3 flex flex-col gap-2 text-ink-soft">
-                    <p>
-                        <strong className="text-ink">A.</strong> Modelul X are o rată de acceptare
-                        diferită decât Prompt-ul Y la formularea de mesaje de dezinformare.
-                    </p>
-                    <p>
-                        <strong className="text-ink">B.</strong> Prompt-ul X are o rată de
-                        acceptare diferită decât Prompt-ul Y la formularea de mesaje de
-                        dezinformare de către modelul W.
-                    </p>
-                    <p>
-                        <strong className="text-ink">C.</strong> Dezinformările de tip X au o rată
-                        de acceptare diferită decât dezinformările de tip Y în formularea de mesaj
-                        de dezinformare de către modelul W.
-                    </p>
-                </div>
-            </details>
-
             {locked ? (
                 <section className="flex flex-col gap-4">
                     <div className="card flex flex-col gap-2">
+                        {type && (
+                            <p>
+                                <strong>Tip ipoteză:</strong>{" "}
+                                {HYPOTHESIS_TYPES.find((t) => t.value === type)?.title} ({type})
+                            </p>
+                        )}
                         <p><strong>H0:</strong> {submission!.hypothesis_null}</p>
                         <p><strong>H1:</strong> {submission!.hypothesis_alt}</p>
                     </div>
@@ -126,7 +120,9 @@ export default async function SubmissionPage() {
                                 </a>
                             )}
                             <p className="whitespace-pre-wrap">{q.prompt}</p>
-                            <p className="text-sm text-ink-soft">Categorie: {q.category}</p>
+                            {q.category && (
+                                <p className="text-sm text-ink-soft">Tip de dezinformare: {q.category}</p>
+                            )}
                         </div>
                     ))}
                 </section>
@@ -139,6 +135,7 @@ export default async function SubmissionPage() {
                     )}
                     <SubmissionForm
                         submissionId={submission!.id}
+                        initialType={type}
                         initialH0={submission!.hypothesis_null ?? ""}
                         initialH1={submission!.hypothesis_alt ?? ""}
                         initialItems={items.map((q) => ({
@@ -148,6 +145,29 @@ export default async function SubmissionPage() {
                         }))}
                     />
                 </>
+            )}
+
+            {cohort.m2_closed_at && (
+                <section className="card flex flex-col gap-3">
+                    <h2 className="text-2xl">Itemii tăi și evaluările primite</h2>
+                    {cohort.results_released_at ? (
+                        <>
+                            <p className="text-ink-soft">
+                                Descarcă un fișier CSV cu itemii tăi și evaluarea fiecărui validator.
+                                Validatorii sunt anonimi (V1, V2); „Staff” marchează evaluările
+                                completate de echipă.
+                            </p>
+                            <a href="/submission/export-results" className="btn btn-primary self-start">
+                                Descarcă CSV
+                            </a>
+                        </>
+                    ) : (
+                        <p className="text-ink-soft">
+                            Echipa completează acum evaluările care lipsesc. Descărcarea apare aici
+                            imediat ce rezultatele sunt publicate.
+                        </p>
+                    )}
+                </section>
             )}
 
             {cohort.m2_closed_at && (

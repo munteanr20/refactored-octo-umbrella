@@ -8,6 +8,7 @@ type SubmissionDetail = {
     id: string;
     hypothesis_null: string | null;
     hypothesis_alt: string | null;
+    hypothesis_type: string | null;
     test_results: string | null;
     submitted_at: string | null;
     profiles: { email: string } | null;
@@ -41,7 +42,7 @@ export default async function SubmissionDetailPage({
 
     const { data } = await supabase
         .from("submissions")
-        .select("id, hypothesis_null, hypothesis_alt, test_results, submitted_at, profiles(email)")
+        .select("id, hypothesis_type, hypothesis_null, hypothesis_alt, test_results, submitted_at, profiles(email)")
         .eq("id", id)
         .single();
 
@@ -59,7 +60,7 @@ export default async function SubmissionDetailPage({
         .from("admin_feedback")
         .select("id, feedback_text, created_at")
         .eq("submission_id", id)
-        .order("created_at", { ascending: false });
+        .order("created_at", { ascending: true });
 
     const reliability = await computeSubmissionReliability(id);
 
@@ -75,6 +76,7 @@ export default async function SubmissionDetailPage({
                 <h2 className="text-xl">Ipoteza</h2>
                 <p><strong>H0:</strong> {submission?.hypothesis_null}</p>
                 <p><strong>H1:</strong> {submission?.hypothesis_alt}</p>
+                <p><strong>Tip:</strong> {submission?.hypothesis_type ?? "neales încă"}</p>
             </section>
 
             <section className="flex flex-col gap-4">
@@ -140,7 +142,7 @@ export default async function SubmissionDetailPage({
             </section>
 
             <section className="flex flex-col gap-4">
-                <h2 className="text-2xl">Feedback</h2>
+                <h2 className="text-2xl">Feedback pentru {submission?.profiles?.email}</h2>
                 {feedback?.map((f) => (
                     <div key={f.id} className="card card-note">
                         <p className="text-xs text-ink-soft">{fmtDate(f.created_at)}</p>

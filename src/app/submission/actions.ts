@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { validateSubmission, type ItemInput } from "@/lib/submission-rules";
+import {
+    needsCategory,
+    validateSubmission,
+    type ItemInput,
+} from "@/lib/submission-rules";
 
 export type SubmitResult = { ok: true } | { ok: false; error: string };
 
 export async function submitSubmission(
     submissionId: string,
+    type: string,
     h0: string,
     h1: string,
     items: ItemInput[]
@@ -15,10 +20,14 @@ export async function submitSubmission(
     const clean: ItemInput[] = items.map((it) => ({
         source_url: String(it.source_url ?? "").trim(),
         prompt: String(it.prompt ?? "").trim(),
-        category: String(it.category ?? "").trim(),
+        // categories exist only for type C hypotheses
+        category: needsCategory(type) ? String(it.category ?? "").trim() : "",
     }));
 
-    const errors = validateSubmission(String(h0 ?? "").trim(), String(h1 ?? "").trim(), clean);
+    const cleanH0 = String(h0 ?? "").trim();
+    const cleanH1 = String(h1 ?? "").trim();
+
+    const errors = validateSubmission(type, cleanH0, cleanH1, clean);
     if (errors.length > 0) {
         return { ok: false, error: errors[0].message };
     }
@@ -26,8 +35,9 @@ export async function submitSubmission(
     const supabase = await createClient();
     const { error } = await supabase.rpc("save_submission", {
         p_submission_id: submissionId,
-        p_h0: String(h0).trim(),
-        p_h1: String(h1).trim(),
+        p_type: type,
+        p_h0: cleanH0,
+        p_h1: cleanH1,
         p_items: clean,
     });
 

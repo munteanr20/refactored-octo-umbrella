@@ -12,6 +12,7 @@ type Row = {
     validator_id: string;
     verdict: "valid" | "invalid" | null;
     rating: number | null;
+    filled_by_admin: boolean;
     profiles: { email: string } | null; // the validator
 };
 
@@ -29,7 +30,7 @@ async function fetchRows(filter: {
         let query = supabase
             .from("validations")
             .select(
-                "id, question_id, validator_id, verdict, rating, profiles!validator_id(email), questions!inner(submission_id, submissions!inner(cohort_id))"
+                "id, question_id, validator_id, verdict, rating, filled_by_admin, profiles!validator_id(email), questions!inner(submission_id, submissions!inner(cohort_id))"
             )
             .order("id")
             .range(from, from + PAGE_SIZE - 1);
@@ -68,8 +69,9 @@ function analyze(rows: Row[]) {
     let completedItems = 0;
 
     for (const list of byItem.values()) {
+        // Peer reliability: only evaluations given by students, never staff fill-ins.
         const done = list
-            .filter((r) => r.verdict !== null)
+            .filter((r) => r.verdict !== null && !r.filled_by_admin)
             .sort((a, b) => a.validator_id.localeCompare(b.validator_id));
         if (done.length < 2) continue;
 
@@ -98,7 +100,7 @@ function analyze(rows: Row[]) {
 
 export type Reliability = {
     assignedItems: number;
-    completedItems: number; // items with at least 2 completed verdicts
+    completedItems: number; // items with at least 2 completed student verdicts
     ratedPairs: number; // items valid for both validators (ICC sample)
     agreement: BinaryAgreement | null;
     icc: IccResult | null;
@@ -120,6 +122,8 @@ export async function computeSubmissionReliability(
 export type CohortReport = Reliability & {
     incompleteItems: number;
     underAssignedItems: number; // items with fewer than 2 validators assigned
+    pendingRows: number; // evaluations nobody has filled in yet
+    staffFilledRows: number; // evaluations filled in by staff
     pendingByValidator: { email: string; remaining: number }[];
 };
 
@@ -148,6 +152,8 @@ export async function computeCohortReport(cohortId: string): Promise<CohortRepor
         icc: a.icc,
         incompleteItems: a.byItem.size - a.completedItems,
         underAssignedItems,
+        pendingRows: rows.filter((r) => r.verdict === null).length,
+        staffFilledRows: rows.filter((r) => r.filled_by_admin).length,
         pendingByValidator: [...pending.entries()]
             .map(([email, remaining]) => ({ email, remaining }))
             .sort((x, y) => y.remaining - x.remaining),

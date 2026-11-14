@@ -36,6 +36,7 @@ export default async function SiteHeader() {
                 { href: "/admin/cohorts", label: "Cohorte" },
                 { href: "/admin/submissions", label: "Trimiteri" },
                 { href: "/admin/stats", label: "Statistici" },
+                { href: "/admin/labels", label: "Completări" },
             ]
             : [
                 { href: "/dashboard", label: "Acasă" },

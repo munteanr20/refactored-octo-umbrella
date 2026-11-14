@@ -22,9 +22,10 @@ export default async function AdminPage() {
     }
 
     const cards = [
-        { href: "/admin/cohorts", title: "Cohorte", text: "Creează o cohortă, închide etapele și formează grupurile." },
+        { href: "/admin/cohorts", title: "Cohorte", text: "Creează o cohortă, închide etapele, formează grupurile și publică rezultatele." },
         { href: "/admin/submissions", title: "Trimiteri", text: "Citește ipotezele și itemii, scrie feedback, exportă CSV." },
         { href: "/admin/stats", title: "Statistici și progres", text: "Acord, κ, AC1, ICC și cine mai are de evaluat." },
+        { href: "/admin/labels", title: "Completări", text: "Evaluările lipsă, completate de echipă înainte de publicare." },
     ];
 
     return (
@@ -41,7 +42,7 @@ export default async function AdminPage() {
                 </section>
             )}
 
-            <div className="grid gap-4 sm:grid-cols-3">
+            <div className="grid gap-4 sm:grid-cols-2">
                 {cards.map((c) => (
                     <Link key={c.href} href={c.href} className="card card-link flex flex-col gap-2 no-underline">
                         <h2 className="text-xl">{c.title}</h2>

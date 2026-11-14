@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/server";
-import { getCurrentCohort } from "@/lib/current-cohort";
+import { getCohortForAdmin } from "@/lib/current-cohort";
 
 function csvEscape(value: string | null | undefined): string {
     const str = value ?? "";
@@ -16,6 +16,7 @@ type ItemRow = {
     category: string | null;
     order_index: number;
     submissions: {
+        hypothesis_type: string | null;
         hypothesis_null: string | null;
         hypothesis_alt: string | null;
         profiles: { email: string } | null;
@@ -24,12 +25,12 @@ type ItemRow = {
 
 const PAGE_SIZE = 1000;
 
-export async function GET() {
+export async function GET(request: Request) {
     const supabase = await createClient();
-    const cohort = await getCurrentCohort();
+    const cohort = await getCohortForAdmin(new URL(request.url).searchParams.get("cohort"));
 
     if (!cohort) {
-        return new Response("No active cohort", { status: 404 });
+        return new Response("No cohort", { status: 404 });
     }
 
     const items: ItemRow[] = [];
@@ -38,7 +39,7 @@ export async function GET() {
         const { data, error } = await supabase
             .from("questions")
             .select(
-                "id, source_url, prompt, category, order_index, submissions!inner(cohort_id, hypothesis_null, hypothesis_alt, profiles(email))"
+                "id, source_url, prompt, category, order_index, submissions!inner(cohort_id, hypothesis_type, hypothesis_null, hypothesis_alt, profiles(email))"
             )
             .eq("submissions.cohort_id", cohort.id)
             .order("id")
@@ -62,6 +63,7 @@ export async function GET() {
 
     const header = [
         "author_email",
+        "hypothesis_type",
         "hypothesis_null",
         "hypothesis_alt",
         "item_number",
@@ -76,6 +78,7 @@ export async function GET() {
         rows.push(
             [
                 csvEscape(q.submissions.profiles?.email),
+                csvEscape(q.submissions.hypothesis_type),
                 csvEscape(q.submissions.hypothesis_null),
                 csvEscape(q.submissions.hypothesis_alt),
                 String(q.order_index + 1),

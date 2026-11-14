@@ -4,8 +4,11 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { submitSubmission } from "./actions";
 import {
+    HYPOTHESIS_TYPES,
     MAX_ITEMS,
+    needsCategory,
     validateSubmission,
+    type HypothesisType,
     type ItemInput,
 } from "@/lib/submission-rules";
 
@@ -14,6 +17,7 @@ type Err = { message: string; part?: string };
 
 type Props = {
     submissionId: string;
+    initialType: HypothesisType | null;
     initialH0: string;
     initialH1: string;
     initialItems: ItemInput[];
@@ -54,6 +58,7 @@ function Field({
 
 export default function SubmissionForm({
                                            submissionId,
+                                           initialType,
                                            initialH0,
                                            initialH1,
                                            initialItems,
@@ -61,6 +66,7 @@ export default function SubmissionForm({
     const router = useRouter();
     const [pending, startTransition] = useTransition();
 
+    const [type, setType] = useState<HypothesisType | null>(initialType);
     const [h0, setH0] = useState(initialH0);
     const [h1, setH1] = useState(initialH1);
     const nextKey = useRef(Math.max(initialItems.length, 1));
@@ -74,6 +80,8 @@ export default function SubmissionForm({
     const [formError, setFormError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [dirty, setDirty] = useState(false);
+
+    const categoryRequired = needsCategory(type ?? "");
 
     useEffect(() => {
         if (!dirty) return;
@@ -111,13 +119,13 @@ export default function SubmissionForm({
     function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
         e.preventDefault();
 
-        const found = validateSubmission(h0.trim(), h1.trim(), items);
+        const found = validateSubmission(type ?? "", h0.trim(), h1.trim(), items);
         const map: Record<string, Err> = {};
         let firstTarget: string | null = null;
 
         for (const err of found) {
             let id = err.field;
-            let target = err.field;
+            let target = err.field === "type" ? "type-A" : err.field;
             if (err.field.startsWith("item-")) {
                 const idx = Number(err.field.slice(5));
                 const key = items[idx].key;
@@ -134,15 +142,14 @@ export default function SubmissionForm({
             const el = document.getElementById(firstTarget);
             el?.scrollIntoView({ behavior: "smooth", block: "center" });
             (el as HTMLElement | null)?.focus({ preventScroll: true });
-            setFormError(
-                `Corectează câmpurile marcate (${Object.keys(map).length}).`
-            );
+            setFormError(`Corectează câmpurile marcate (${Object.keys(map).length}).`);
             return;
         }
 
         startTransition(async () => {
             const res = await submitSubmission(
                 submissionId,
+                type!,
                 h0.trim(),
                 h1.trim(),
                 items.map(({ source_url, prompt, category }) => ({
@@ -164,7 +171,10 @@ export default function SubmissionForm({
     }
 
     const completed = items.filter(
-        (i) => i.source_url.trim() && i.prompt.trim() && i.category.trim()
+        (i) =>
+            Boolean(i.source_url.trim()) &&
+            Boolean(i.prompt.trim()) &&
+            (!categoryRequired || Boolean(i.category.trim()))
     ).length;
     const pct = items.length ? Math.round((completed / items.length) * 100) : 0;
 
@@ -176,6 +186,38 @@ export default function SubmissionForm({
         <form onSubmit={handleSubmit} className="flex flex-col gap-8" noValidate>
             <section className="flex flex-col gap-4">
                 <h2 className="text-2xl">Ipoteza</h2>
+
+                <fieldset id="type" className="flex flex-col gap-2">
+                    <legend className="mb-1 text-sm font-semibold">Tipul ipotezei</legend>
+                    {HYPOTHESIS_TYPES.map((t) => (
+                        <label key={t.value} className="choice">
+                            <input
+                                type="radio"
+                                id={`type-${t.value}`}
+                                name="hypothesis_type"
+                                value={t.value}
+                                checked={type === t.value}
+                                onChange={() => {
+                                    touch();
+                                    setType(t.value);
+                                }}
+                                className="choice-input"
+                            />
+                            <span className="choice-box !items-start">
+                <span className="font-display text-xl">{t.value}</span>
+                <span className="flex flex-col">
+                  <span className="font-semibold">{t.title}</span>
+                  <span className="text-sm text-ink-soft">{t.text}</span>
+                </span>
+              </span>
+                        </label>
+                    ))}
+                    {errors.type && (
+                        <p role="alert" className="text-sm text-ember">
+                            {errors.type.message}
+                        </p>
+                    )}
+                </fieldset>
 
                 <Field
                     id="h0"
@@ -287,22 +329,24 @@ export default function SubmissionForm({
                 />
                             </Field>
 
-                            <Field
-                                id={`${id}-category`}
-                                label="Categorie"
-                                hint="Scrie una nouă sau alege una deja folosită."
-                                error={partErr("category")}
-                            >
-                                <input
+                            {categoryRequired && (
+                                <Field
                                     id={`${id}-category`}
-                                    list="category-options"
-                                    value={it.category}
-                                    onChange={(e) => updateItem(it.key, { category: e.target.value })}
-                                    className="field"
-                                    aria-invalid={!!partErr("category")}
-                                    aria-describedby={partErr("category") ? `${id}-category-err` : `${id}-category-hint`}
-                                />
-                            </Field>
+                                    label="Tipul de dezinformare"
+                                    hint="Scrie un tip nou sau alege unul deja folosit."
+                                    error={partErr("category")}
+                                >
+                                    <input
+                                        id={`${id}-category`}
+                                        list="category-options"
+                                        value={it.category}
+                                        onChange={(e) => updateItem(it.key, { category: e.target.value })}
+                                        className="field"
+                                        aria-invalid={!!partErr("category")}
+                                        aria-describedby={partErr("category") ? `${id}-category-err` : `${id}-category-hint`}
+                                    />
+                                </Field>
+                            )}
                         </div>
                     );
                 })}
@@ -315,8 +359,8 @@ export default function SubmissionForm({
             </section>
 
             <div className="sticky-bar flex flex-col gap-2">
-                <div className="h-1 w-full rounded bg-line" aria-hidden="true">
-                    <div className="h-1 rounded bg-brand" style={{ width: `${pct}%` }} />
+                <div className="progress" aria-hidden="true">
+                    <div style={{ width: `${pct}%` }} />
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <p className="text-sm">

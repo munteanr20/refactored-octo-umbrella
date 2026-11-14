@@ -12,18 +12,26 @@ export async function saveAllValidations(formData: FormData) {
     } = await supabase.auth.getUser();
 
     const cohort = await getCurrentM2Cohort();
-    if (cohort?.m2_closed_at) {
+    if (!cohort) {
+        redirect(
+            "/validate?error=" +
+            encodeURIComponent("Validarea nu este deschisă încă.")
+        );
+    }
+    if (cohort.m2_closed_at) {
         redirect(
             "/validate?error=" +
             encodeURIComponent("Evaluarea este închisă, nu mai poți modifica.")
         );
     }
 
-    // RLS already limits this to the caller's own rows; the filter makes it explicit.
+    // RLS already limits this to the caller's own rows; the filters make it explicit
+    // and keep it to the current cohort.
     const { data: assigned } = await supabase
         .from("validations")
-        .select("id")
+        .select("id, questions!inner(submissions!inner(cohort_id))")
         .eq("validator_id", user!.id)
+        .eq("questions.submissions.cohort_id", cohort.id)
         .order("id");
 
     type Pending = {

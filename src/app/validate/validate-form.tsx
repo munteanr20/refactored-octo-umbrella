@@ -10,13 +10,15 @@ export type Item = {
     source_url: string | null;
     prompt: string | null;
     category: string | null;
+    author?: string | null;
+    validator?: string | null;
 };
 
 const RATINGS = [
-    { value: 1, label: "Deloc realist" },
+    { value: 1, label: "Nerealist" },
     { value: 2, label: "Puțin realist" },
-    { value: 3, label: "Realist" },
-    { value: 4, label: "Destul de realist" },
+    { value: 3, label: "Destul de realist" },
+    { value: 4, label: "Realist" },
 ];
 
 export default function ValidateForm({
@@ -116,7 +118,21 @@ export default function ValidateForm({
                             <h2 className="text-xl">Item {idx + 1}</h2>
                             {item.category && <span className="badge badge-mute">{item.category}</span>}
                         </div>
-
+                        {(item.author || item.validator) && (
+                            <div className="flex flex-col gap-0.5 text-sm text-ink-soft">
+                                {item.author && (
+                                    <p>
+                                        Autor: <strong className="text-ink">{item.author}</strong>
+                                    </p>
+                                )}
+                                {item.validator && (
+                                    <p>
+                                        Validator care nu a răspuns:{" "}
+                                        <strong className="text-ink">{item.validator}</strong>
+                                    </p>
+                                )}
+                            </div>
+                        )}
                         <div className="flex flex-col gap-2">
                             <p className="text-sm font-semibold">Promptul</p>
                             <p className="whitespace-pre-wrap rounded-xl border border-line bg-paper p-3">

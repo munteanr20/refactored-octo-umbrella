@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { getCurrentCohort } from "@/lib/current-cohort";
+import { getCohortForAdmin } from "@/lib/current-cohort";
 import { computeCohortReport } from "@/lib/reliability";
 import { fmt } from "@/lib/stats";
 import PageHeader from "@/components/page-header";
+import CohortPicker from "@/components/cohort-picker";
 
 export const metadata = { title: "Statistici" };
 
@@ -16,8 +17,13 @@ function Tile({ label, value, note }: { label: string; value: string; note?: str
     );
 }
 
-export default async function AdminStatsPage() {
-    const cohort = await getCurrentCohort();
+export default async function AdminStatsPage({
+                                                 searchParams,
+                                             }: {
+    searchParams: Promise<{ cohort?: string }>;
+}) {
+    const params = await searchParams;
+    const cohort = await getCohortForAdmin(params.cohort);
 
     if (!cohort) {
         return (
@@ -29,6 +35,7 @@ export default async function AdminStatsPage() {
 
     const r = await computeCohortReport(cohort.id);
     const pct = r.assignedItems ? Math.round((r.completedItems / r.assignedItems) * 100) : 0;
+    const q = `?cohort=${cohort.id}`;
 
     return (
         <main className="page">
@@ -36,16 +43,18 @@ export default async function AdminStatsPage() {
                 Valorile se actualizează pe măsură ce studenții își termină evaluările.
             </PageHeader>
 
+            <CohortPicker selectedId={cohort.id} action="/admin/stats" />
+
             <div className="flex flex-wrap gap-2">
-                <Link href="/admin/submissions/export-items" className="btn">Exportă itemii (CSV)</Link>
-                <Link href="/admin/submissions/export-validations" className="btn">Exportă evaluările (CSV)</Link>
+                <Link href={`/admin/submissions/export-items${q}`} className="btn">Exportă itemii (CSV)</Link>
+                <Link href={`/admin/submissions/export-validations${q}`} className="btn">Exportă evaluările (CSV)</Link>
             </div>
 
             <section className="flex flex-col gap-3">
                 <h2 className="text-2xl">Progres</h2>
                 <div className="card flex flex-col gap-3">
                     <p>
-                        Itemi cu 2 evaluări completate: <strong>{r.completedItems}</strong> din {r.assignedItems}
+                        Itemi cu 2 evaluări de la studenți: <strong>{r.completedItems}</strong> din {r.assignedItems}
                     </p>
                     <div className="progress" aria-hidden="true"><div style={{ width: `${pct}%` }} /></div>
                     {r.underAssignedItems > 0 && (
@@ -53,6 +62,19 @@ export default async function AdminStatsPage() {
                             {r.underAssignedItems} itemi au mai puțin de 2 validatori atribuiți.
                         </p>
                     )}
+                    <p className="text-sm text-ink-soft">
+                        Evaluări lipsă: {r.pendingRows}. Completate de echipă: {r.staffFilledRows} (nu intră în
+                        statistici).
+                        {r.pendingRows > 0 && cohort.m2_closed_at && !cohort.results_released_at && (
+                            <>
+                                {" "}
+                                <Link href={`/admin/labels?cohort=${cohort.id}`} className="underline">
+                                    Completează-le
+                                </Link>
+                                .
+                            </>
+                        )}
+                    </p>
                 </div>
             </section>
 
@@ -87,7 +109,7 @@ export default async function AdminStatsPage() {
                         </div>
                         <p className="text-sm text-ink-soft">
                             Model one-way, deoarece validatorii diferă de la un item la altul. Se
-                            folosesc doar itemii marcați valid de ambii validatori.
+                            folosesc doar itemii marcați valid de ambii validatori studenți.
                         </p>
                     </>
                 ) : (

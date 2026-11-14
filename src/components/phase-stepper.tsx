@@ -2,6 +2,7 @@ type Phase = {
     m1_closed_at: string | null;
     groups_formed_at: string | null;
     m2_closed_at: string | null;
+    results_released_at?: string | null;
 };
 type State = "done" | "active" | "todo";
 
@@ -9,6 +10,7 @@ function getSteps(c: Phase): { label: string; hint: string; state: State }[] {
     const m1 = !!c.m1_closed_at;
     const groups = !!c.groups_formed_at;
     const m2 = !!c.m2_closed_at;
+    const released = !!c.results_released_at;
     return [
         {
             label: "Trimiterea itemilor",
@@ -21,9 +23,14 @@ function getSteps(c: Phase): { label: string; hint: string; state: State }[] {
             hint: m2 ? "încheiată" : groups ? "deschisă" : m1 ? "se formează grupurile" : "urmează",
         },
         {
-            label: "Rezultatele testării",
-            state: m2 ? "active" : "todo",
-            hint: m2 ? "deschis" : "urmează",
+            label: "Completări echipă",
+            state: released ? "done" : m2 ? "active" : "todo",
+            hint: released ? "încheiate" : m2 ? "în curs" : "urmează",
+        },
+        {
+            label: "Rezultate",
+            state: released ? "active" : "todo",
+            hint: released ? "descărcare disponibilă" : "urmează",
         },
     ];
 }
@@ -53,7 +60,7 @@ function Marker({ state, n }: { state: State; n: number }) {
 export default function PhaseStepper({ cohort }: { cohort: Phase }) {
     const steps = getSteps(cohort);
     return (
-        <ol className="grid grid-cols-3 gap-3" aria-label="Etapele laboratorului">
+        <ol className="grid grid-cols-2 gap-4 sm:grid-cols-4" aria-label="Etapele laboratorului">
             {steps.map((s, i) => (
                 <li
                     key={s.label}
@@ -62,7 +69,9 @@ export default function PhaseStepper({ cohort }: { cohort: Phase }) {
                 >
                     <div className="flex items-center gap-2">
                         <Marker state={s.state} n={i + 1} />
-                        {i < steps.length - 1 && <span className="h-px flex-1 bg-line" aria-hidden="true" />}
+                        {i < steps.length - 1 && (
+                            <span className="hidden h-px flex-1 bg-line sm:block" aria-hidden="true" />
+                        )}
                     </div>
                     <div>
                         <p className={`text-sm font-semibold ${s.state === "todo" ? "text-ink-soft" : ""}`}>

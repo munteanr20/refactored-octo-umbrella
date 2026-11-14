@@ -180,3 +180,28 @@ export async function formGroups(cohortId: string) {
 
     revalidatePath("/admin/cohorts");
 }
+
+export async function releaseResults(cohortId: string) {
+    const supabase = await createClient();
+
+    const { data: cohort } = await supabase
+        .from("cohorts")
+        .select("m2_closed_at, results_released_at")
+        .eq("id", cohortId)
+        .single();
+
+    if (!cohort?.m2_closed_at || cohort.results_released_at) {
+        console.error("releaseResults: validation not closed, or already released");
+        return;
+    }
+
+    const { error } = await supabase
+        .from("cohorts")
+        .update({ results_released_at: new Date().toISOString() })
+        .eq("id", cohortId);
+    if (error) console.error("releaseResults failed:", error);
+
+    revalidatePath("/admin/cohorts");
+    revalidatePath("/submission");
+    revalidatePath("/dashboard");
+}

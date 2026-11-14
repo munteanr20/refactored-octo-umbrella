@@ -41,8 +41,11 @@ export default async function ValidatePage({
 
     const { data } = await supabase
         .from("validations")
-        .select("id, verdict, rating, questions(prompt, category, source_url)")
+        .select(
+            "id, verdict, rating, questions!inner(prompt, category, source_url, submissions!inner(cohort_id))"
+        )
         .eq("validator_id", user!.id)
+        .eq("questions.submissions.cohort_id", cohort.id)
         .order("id");
 
     const validations = data as unknown as ValidationRow[] | null;

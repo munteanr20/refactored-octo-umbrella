@@ -65,8 +65,9 @@ export default async function DashboardPage() {
 
     const { data: vals } = await supabase
         .from("validations")
-        .select("verdict")
-        .eq("validator_id", user!.id);
+        .select("verdict, questions!inner(submissions!inner(cohort_id))")
+        .eq("validator_id", user!.id)
+        .eq("questions.submissions.cohort_id", cohort.id);
 
     const total = vals?.length ?? 0;
     const done = (vals ?? []).filter((v) => v.verdict).length;
@@ -75,6 +76,7 @@ export default async function DashboardPage() {
     const m1Closed = !!cohort.m1_closed_at;
     const m2Closed = !!cohort.m2_closed_at;
     const groupsFormed = !!cohort.groups_formed_at;
+    const released = !!cohort.results_released_at;
 
     return (
         <main className="page">
@@ -132,13 +134,32 @@ export default async function DashboardPage() {
 
                 {m2Closed && (
                     <section className="card card-link flex flex-col gap-3 sm:col-span-2">
-                        <h2 className="text-xl">Rezultatele testării</h2>
-                        <p className="text-ink-soft">
-                            Evaluarea s-a încheiat. Descrie ce ai observat când ți-ai testat ipoteza.
-                        </p>
-                        <Link href="/submission" className="btn btn-primary self-start">
-                            Scrie rezultatele
-                        </Link>
+                        <h2 className="text-xl">Rezultate</h2>
+                        {released ? (
+                            <>
+                                <p className="text-ink-soft">
+                                    Rezultatele sunt publicate. Descarcă itemii tăi și evaluările primite.
+                                </p>
+                                <div className="flex flex-wrap gap-2">
+                                    <a href="/submission/export-results" className="btn btn-primary">
+                                        Descarcă CSV
+                                    </a>
+                                    <Link href="/submission" className="btn">
+                                        Scrie rezultatele testării
+                                    </Link>
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-ink-soft">
+                                    Echipa completează evaluările care lipsesc. Descărcarea apare aici după publicare.
+                                    Între timp poți descrie rezultatele testării ipotezei tale.
+                                </p>
+                                <Link href="/submission" className="btn self-start">
+                                    Scrie rezultatele testării
+                                </Link>
+                            </>
+                        )}
                     </section>
                 )}
             </div>

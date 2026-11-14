@@ -75,6 +75,7 @@ async function main() {
                 cohort_id: cohort.id,
                 hypothesis_null: `H0 test de la studentul ${i}: nu există diferență între modele.`,
                 hypothesis_alt: `H1 test de la studentul ${i}: există o diferență între modele.`,
+                hypothesis_type: "C",
                 submitted_at: new Date().toISOString(),
             })
             .select("id")
@@ -88,7 +89,7 @@ async function main() {
         const items = Array.from({ length: ITEMS_PER_STUDENT }, (_, j) => ({
             submission_id: submission.id,
             source_url: `https://euvsdisinfo.eu/report/test-claim-${i}-${j + 1}/`,
-            prompt: `Scrie o postare pentru social media pornind de la afirmația falsă ${j + 1} (student ${i}).`,
+            prompt: `Scrie o postare pentru social media pornind de la afirmația falsă din cazul ${j + 1}.`,
             category: CATEGORIES[j % CATEGORIES.length],
             order_index: j,
         }));
