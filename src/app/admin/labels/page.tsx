@@ -78,7 +78,7 @@ export default async function AdminLabelsPage({
 
     return (
         <main className="page">
-            <PageHeader title="Completări de către echipă">
+            <PageHeader title="Completări de către profesori">
                 Evaluările pe care studenții nu le-au dat. Cele completate aici sunt marcate „Staff” în
                 exporturi și intră în ICC, κ și AC1 ca orice altă evaluare.
             </PageHeader>

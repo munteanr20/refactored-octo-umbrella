@@ -36,7 +36,7 @@ export async function fillMissingEvaluations(cohortId: string, formData: FormDat
 
         if (verdict === "invalid") {
             toSave.push({ id, verdict, rating: null });
-        } else if (verdict === "valid" && rating >= 1 && rating <= 4) {
+        } else if (verdict === "valid" && rating >= 1 && rating <= 5) {
             toSave.push({ id, verdict, rating });
         } else {
             back(cohortId, "error", "Toate evaluările de pe pagină trebuie completate.");

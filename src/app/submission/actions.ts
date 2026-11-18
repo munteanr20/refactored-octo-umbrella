@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import {
-    needsCategory,
     validateSubmission,
     type ItemInput,
 } from "@/lib/submission-rules";
@@ -20,8 +19,7 @@ export async function submitSubmission(
     const clean: ItemInput[] = items.map((it) => ({
         source_url: String(it.source_url ?? "").trim(),
         prompt: String(it.prompt ?? "").trim(),
-        // categories exist only for type C hypotheses
-        category: needsCategory(type) ? String(it.category ?? "").trim() : "",
+        category: String(it.category ?? "").trim(),
     }));
 
     const cleanH0 = String(h0 ?? "").trim();

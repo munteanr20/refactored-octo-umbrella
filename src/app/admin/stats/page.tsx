@@ -54,7 +54,7 @@ export default async function AdminStatsPage({
                 <h2 className="text-2xl">Progres</h2>
                 <div className="card flex flex-col gap-3">
                     <p>
-                        Itemi cu 2 evaluări de la studenți: <strong>{r.completedItems}</strong> din {r.assignedItems}
+                        Itemi cu 2 evaluări: <strong>{r.completedItems}</strong> din {r.assignedItems}
                     </p>
                     <div className="progress" aria-hidden="true"><div style={{ width: `${pct}%` }} /></div>
                     {r.underAssignedItems > 0 && (
@@ -63,7 +63,7 @@ export default async function AdminStatsPage({
                         </p>
                     )}
                     <p className="text-sm text-ink-soft">
-                        Evaluări lipsă: {r.pendingRows}. Completate de echipă: {r.staffFilledRows} (nu intră în
+                        Evaluări lipsă: {r.pendingRows}. Completate de echipă: {r.staffFilledRows} (incluse în
                         statistici).
                         {r.pendingRows > 0 && cohort.m2_closed_at && !cohort.results_released_at && (
                             <>
@@ -99,7 +99,7 @@ export default async function AdminStatsPage({
             </section>
 
             <section className="flex flex-col gap-3">
-                <h2 className="text-2xl">ICC pe notele 1–4</h2>
+                <h2 className="text-2xl">ICC pe notele 1–5</h2>
                 {r.icc ? (
                     <>
                         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -109,7 +109,7 @@ export default async function AdminStatsPage({
                         </div>
                         <p className="text-sm text-ink-soft">
                             Model one-way, deoarece validatorii diferă de la un item la altul. Se
-                            folosesc doar itemii marcați valid de ambii validatori studenți.
+                            folosesc doar itemii marcați valid de ambii validatori.
                         </p>
                     </>
                 ) : (

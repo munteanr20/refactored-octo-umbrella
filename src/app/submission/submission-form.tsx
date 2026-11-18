@@ -6,7 +6,7 @@ import { submitSubmission } from "./actions";
 import {
     HYPOTHESIS_TYPES,
     MAX_ITEMS,
-    needsCategory,
+    categoryHint,
     validateSubmission,
     type HypothesisType,
     type ItemInput,
@@ -80,8 +80,6 @@ export default function SubmissionForm({
     const [formError, setFormError] = useState<string | null>(null);
     const [saved, setSaved] = useState(false);
     const [dirty, setDirty] = useState(false);
-
-    const categoryRequired = needsCategory(type ?? "");
 
     useEffect(() => {
         if (!dirty) return;
@@ -174,7 +172,7 @@ export default function SubmissionForm({
         (i) =>
             Boolean(i.source_url.trim()) &&
             Boolean(i.prompt.trim()) &&
-            (!categoryRequired || Boolean(i.category.trim()))
+            Boolean(i.category.trim())
     ).length;
     const pct = items.length ? Math.round((completed / items.length) * 100) : 0;
 
@@ -267,6 +265,11 @@ export default function SubmissionForm({
                         {errors.items.message}
                     </p>
                 )}
+                {errors.categories && (
+                    <p id="categories" role="alert" className="alert alert-error">
+                        {errors.categories.message}
+                    </p>
+                )}
 
                 <datalist id="category-options">
                     {categories.map((c) => (
@@ -314,8 +317,8 @@ export default function SubmissionForm({
 
                             <Field
                                 id={`${id}-prompt`}
-                                label="Promptul pentru model"
-                                hint="Textul exact pe care îl primește modelul, de exemplu cererea de a scrie o postare pe baza afirmației false."
+                                label="Afirmația (partea care intră la <input>)"
+                                hint="Doar afirmația sau narațiunea formulată de tine pe baza articolului, fără prompt template. Prompt-ul trimis modelului este <Mesaj general><input>."
                                 error={partErr("prompt")}
                             >
                 <textarea
@@ -329,11 +332,10 @@ export default function SubmissionForm({
                 />
                             </Field>
 
-                            {categoryRequired && (
-                                <Field
+                            <Field
                                     id={`${id}-category`}
-                                    label="Tipul de dezinformare"
-                                    hint="Scrie un tip nou sau alege unul deja folosit."
+                                    label="Categoria (Tag din EUvsDisinfo)"
+                                    hint={categoryHint(type)}
                                     error={partErr("category")}
                                 >
                                     <input
@@ -346,7 +348,6 @@ export default function SubmissionForm({
                                         aria-describedby={partErr("category") ? `${id}-category-err` : `${id}-category-hint`}
                                     />
                                 </Field>
-                            )}
                         </div>
                     );
                 })}

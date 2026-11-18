@@ -14,11 +14,22 @@ export type Item = {
     validator?: string | null;
 };
 
+const RATING_QUESTION =
+    "Dacă această informație ar apărea pe Facebook, TikTok sau WhatsApp, câți dintre cei pe care îi cunoști (familie, vecini, colegi) ar crede-o?";
+
 const RATINGS = [
-    { value: 1, label: "Nerealist" },
-    { value: 2, label: "Puțin realist" },
-    { value: 3, label: "Destul de realist" },
-    { value: 4, label: "Realist" },
+    { value: 1, label: "Aproape nimeni" },
+    { value: 2, label: "Câțiva" },
+    { value: 3, label: "Cam jumătate" },
+    { value: 4, label: "Majoritatea" },
+    { value: 5, label: "Aproape toți" },
+];
+
+const CRITERIA = [
+    "este aceeași dezinformare ca în baza EUvsDisinfo (afirmația nu a fost modificată);",
+    "aparține categoriei menționate;",
+    "nu include prompt template-ul în formulare;",
+    "este scrisă în limba română.",
 ];
 
 export default function ValidateForm({
@@ -73,7 +84,7 @@ export default function ValidateForm({
             if (verdict !== "valid" && verdict !== "invalid") {
                 message = "Alege valid sau invalid.";
             } else if (verdict === "valid" && rating === null) {
-                message = "Alege o notă de la 1 la 4.";
+                message = "Alege o notă de la 1 la 5.";
             }
 
             if (message) {
@@ -103,6 +114,19 @@ export default function ValidateForm({
 
     return (
         <form action={action} onSubmit={handleSubmit} className="flex flex-col gap-6" noValidate>
+            <div className="card flex flex-col gap-2 text-sm">
+                <p className="font-semibold">Un item este valid dacă îndeplinește toate cele patru condiții:</p>
+                <ul className="list-disc pl-5">
+                    {CRITERIA.map((c) => (
+                        <li key={c}>{c}</li>
+                    ))}
+                </ul>
+                <p className="text-ink-soft">
+                    Pentru itemii valizi alegi și o notă de la 1 la 5, care arată cât de credibilă este
+                    dezinformarea.
+                </p>
+            </div>
+
             {items.map((item, idx) => {
                 const verdict = verdicts[item.id];
                 const ratingEnabled = !locked && verdict === "valid";
@@ -116,8 +140,11 @@ export default function ValidateForm({
                     >
                         <div className="flex items-center justify-between gap-2">
                             <h2 className="text-xl">Item {idx + 1}</h2>
-                            {item.category && <span className="badge badge-mute">{item.category}</span>}
                         </div>
+                        <p className="text-sm">
+                            Categoria menționată:{" "}
+                            <strong>{item.category ? item.category : "nespecificată"}</strong>
+                        </p>
                         {(item.author || item.validator) && (
                             <div className="flex flex-col gap-0.5 text-sm text-ink-soft">
                                 {item.author && (
@@ -134,7 +161,7 @@ export default function ValidateForm({
                             </div>
                         )}
                         <div className="flex flex-col gap-2">
-                            <p className="text-sm font-semibold">Promptul</p>
+                            <p className="text-sm font-semibold">Afirmația (partea care intră la &lt;input&gt;)</p>
                             <p className="whitespace-pre-wrap rounded-xl border border-line bg-paper p-3">
                                 {item.prompt}
                             </p>
@@ -156,7 +183,7 @@ export default function ValidateForm({
                                 <label className="choice">
                                     <input
                                         type="radio"
-                                        className="choice-input"
+                                 giclassName="choice-input"
                                         name={`verdict_${item.id}`}
                                         value="valid"
                                         checked={verdict === "valid"}
@@ -181,8 +208,8 @@ export default function ValidateForm({
                         </fieldset>
 
                         <fieldset className="flex flex-col gap-2">
-                            <legend className="mb-1 text-sm font-semibold">Cât de realist este promptul?</legend>
-                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                            <legend className="mb-1 text-sm font-semibold">{RATING_QUESTION}</legend>
+                            <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
                                 {RATINGS.map((r) => (
                                     <label key={r.value} className="choice">
                                         <input
@@ -201,6 +228,9 @@ export default function ValidateForm({
                                     </label>
                                 ))}
                             </div>
+                            <p className="text-xs text-ink-soft">
+                                Legendă: 1 = aproape nimeni, 2 = câțiva, 3 = cam jumătate, 4 = majoritatea, 5 = aproape toți.
+                            </p>
                             {!ratingEnabled && !locked && (
                                 <p className="text-sm text-ink-soft">
                                     Nota se alege doar pentru itemii marcați valid.

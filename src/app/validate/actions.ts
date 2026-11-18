@@ -49,7 +49,7 @@ export async function saveAllValidations(formData: FormData) {
 
         if (verdict === "invalid") {
             toSave.push({ id: v.id, number: idx + 1, verdict, rating: null });
-        } else if (verdict === "valid" && rating >= 1 && rating <= 4) {
+        } else if (verdict === "valid" && rating >= 1 && rating <= 5) {
             toSave.push({ id: v.id, number: idx + 1, verdict, rating });
         } else {
             incomplete.push(idx + 1);

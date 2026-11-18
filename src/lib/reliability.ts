@@ -69,9 +69,9 @@ function analyze(rows: Row[]) {
     let completedItems = 0;
 
     for (const list of byItem.values()) {
-        // Peer reliability: only evaluations given by students, never staff fill-ins.
+        // Every completed evaluation counts, including those filled in by staff.
         const done = list
-            .filter((r) => r.verdict !== null && !r.filled_by_admin)
+            .filter((r) => r.verdict !== null)
             .sort((a, b) => a.validator_id.localeCompare(b.validator_id));
         if (done.length < 2) continue;
 

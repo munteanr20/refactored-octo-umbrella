@@ -121,7 +121,7 @@ export default async function SubmissionPage() {
                             )}
                             <p className="whitespace-pre-wrap">{q.prompt}</p>
                             {q.category && (
-                                <p className="text-sm text-ink-soft">Tip de dezinformare: {q.category}</p>
+                                <p className="text-sm text-ink-soft">Categorie: {q.category}</p>
                             )}
                         </div>
                     ))}

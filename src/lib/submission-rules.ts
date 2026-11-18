@@ -28,9 +28,16 @@ export function isHypothesisType(value: string): value is HypothesisType {
     return value === "A" || value === "B" || value === "C";
 }
 
-// The category only makes sense when the hypothesis compares disinformation types.
-export function needsCategory(type: string) {
-    return type === "C";
+// Every item carries a category (the "Tag" from EUvsDisinfo), whatever the hypothesis type.
+// A and B: all items share one category. C: items split between two categories.
+export const MAX_CATEGORIES_TYPE_C = 2;
+
+export function categoryHint(type: string | null) {
+    if (type === "C")
+        return "Tag-ul din EUvsDisinfo. La acest tip de ipoteză folosești două categorii: 10 itemi dintr-una și 10 din cealaltă.";
+    if (type === "A" || type === "B")
+        return "Tag-ul din EUvsDisinfo. La acest tip de ipoteză toți itemii au aceeași categorie.";
+    return "Tag-ul din EUvsDisinfo. Alege mai întâi tipul ipotezei.";
 }
 
 export type ItemInput = {
@@ -81,8 +88,6 @@ export function validateSubmission(
         });
     }
 
-    const categoryRequired = needsCategory(type);
-
     items.forEach((it, idx) => {
         const field = `item-${idx}`;
         if (!it.source_url.trim()) {
@@ -90,15 +95,33 @@ export function validateSubmission(
         } else if (!isEuvsdisinfoUrl(it.source_url.trim())) {
             errors.push({ field, part: "source_url", message: "Linkul trebuie să fie de pe euvsdisinfo.eu." });
         } else if (!it.prompt.trim()) {
-            errors.push({ field, part: "prompt", message: "Scrie promptul." });
+            errors.push({ field, part: "prompt", message: "Scrie afirmația." });
         } else if (it.prompt.length > MAX_PROMPT) {
-            errors.push({ field, part: "prompt", message: "Promptul este prea lung." });
-        } else if (categoryRequired && !it.category.trim()) {
-            errors.push({ field, part: "category", message: "Alege sau scrie o categorie." });
-        } else if (categoryRequired && it.category.length > MAX_CATEGORY) {
+            errors.push({ field, part: "prompt", message: "Afirmația este prea lungă." });
+        } else if (!it.category.trim()) {
+            errors.push({ field, part: "category", message: "Scrie categoria itemului." });
+        } else if (it.category.length > MAX_CATEGORY) {
             errors.push({ field, part: "category", message: "Categoria este prea lungă." });
         }
     });
+
+    // Category consistency across items (only when every item already has a category).
+    const cats = items.map((it) => it.category.trim().toLowerCase()).filter(Boolean);
+    const distinct = new Set(cats);
+    if (isHypothesisType(type) && cats.length === items.length && items.length > 0) {
+        if ((type === "A" || type === "B") && distinct.size > 1) {
+            errors.push({
+                field: "categories",
+                message: "La ipotezele de tip A și B toți itemii trebuie să aibă aceeași categorie.",
+            });
+        }
+        if (type === "C" && distinct.size > MAX_CATEGORIES_TYPE_C) {
+            errors.push({
+                field: "categories",
+                message: "La ipotezele de tip C folosești cel mult două categorii.",
+            });
+        }
+    }
 
     return errors;
 }
