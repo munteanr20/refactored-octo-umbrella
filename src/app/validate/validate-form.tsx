@@ -183,7 +183,7 @@ export default function ValidateForm({
                                 <label className="choice">
                                     <input
                                         type="radio"
-                                 giclassName="choice-input"
+                                        className="choice-input"
                                         name={`verdict_${item.id}`}
                                         value="valid"
                                         checked={verdict === "valid"}
